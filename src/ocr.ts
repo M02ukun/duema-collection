@@ -176,6 +176,8 @@ function render(gray: Uint8ClampedArray, w: number, h: number, v: Variant): HTML
 }
 
 export interface OcrResult extends ParsedCode {
+  /** カードリストで実在が確認できた */
+  valid?: boolean;
   rawText: string;
   preview: string;
 }
@@ -189,6 +191,8 @@ export interface OcrOptions {
   quick?: boolean;
   /** この点数以上の結果が出たらそこで打ち切る */
   goodScore?: number;
+  /** カードリストに実在する組み合わせなら true（見つかった時点で打ち切る） */
+  isValid?: (p: ParsedCode) => boolean;
   onProgress?: (p: number) => void;
 }
 
@@ -196,7 +200,7 @@ export interface OcrOptions {
  * 加工方法と読み取りモードを何通りか試し、一番それらしい結果を返す。
  */
 export async function recognizeCode(src: Source, crop: CropRect, opts: OcrOptions = {}): Promise<OcrResult> {
-  const { knownSets = [], targetHeight = 220, quick = false, goodScore = 6, onProgress } = opts;
+  const { knownSets = [], targetHeight = 220, quick = false, goodScore = 6, isValid, onProgress } = opts;
   const worker = await getWorker(onProgress);
   const { gray, w, h } = cropGray(src, crop, targetHeight);
   const plan: [Variant, PSM][] = quick
@@ -219,6 +223,9 @@ export async function recognizeCode(src: Source, crop: CropRect, opts: OcrOption
     await worker.setParameters({ tessedit_pageseg_mode: psm });
     const { data } = await worker.recognize(canvas);
     const parsed = parseCodeText(data.text, knownSets);
+    if (isValid?.(parsed)) {
+      return { ...parsed, valid: true, rawText: data.text.replace(/\s+/g, ' ').trim(), preview: canvas.toDataURL('image/png') };
+    }
     if (!best || parsed.score > best.score) {
       best = { ...parsed, rawText: data.text.replace(/\s+/g, ' ').trim(), preview: canvas.toDataURL('image/png') };
     }
@@ -232,5 +239,6 @@ export async function recognizeCode(src: Source, crop: CropRect, opts: OcrOption
     if (bestSet.strength > r.setStrength) r.setCode = bestSet.code;
     if (bestNo.score > r.numberScore) { r.number = bestNo.no; r.rarity = r.rarity || bestNo.rarity; }
   }
+  if (isValid?.(r)) r.valid = true;
   return r;
 }

@@ -73,3 +73,12 @@ input, select { font: inherit; font-size: 16px; color: var(--text); background: 
 .scanner-tip { position: absolute; left: 0; right: 0; bottom: 6px; margin: 0; padding: 0 12px; text-align: center; color: #fff; font-size: 12px; text-shadow: 0 1px 2px #000; }
 .scanner-last { word-break: break-all; min-height: 1.4em; }
 input[type=checkbox] { width: 20px; height: 20px; padding: 0; flex: none; accent-color: var(--accent); }
+.card-list.master li { gap: 10px; }
+.card-list.master .info { flex: 1; }
+.add-btn { flex: none; padding: 8px 14px; font-size: 18px; }
+.card-list.big li { border: 2px solid var(--accent); }
+.card-list.big .add-btn { font-size: 16px; padding: 12px 16px; }
+details.manual summary { cursor: pointer; font-weight: 600; }
+details.manual .card-form { border: 0; padding: 10px 0 0; }
+.zoom-row { flex-direction: row; align-items: center; gap: 8px; }
+.zoom-row input { flex: 1; padding: 0; }

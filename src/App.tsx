@@ -1,9 +1,7 @@
-import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from './db';
+import { useEffect, useState } from 'react';
 import { CollectionList } from './components/CollectionList';
-import { CardForm, type FormValues } from './components/CardForm';
-import { ScanPanel } from './components/ScanPanel';
+import { AddPanel } from './components/AddPanel';
+import { loadCardDb, type CardDb } from './carddb';
 import { Settings } from './components/Settings';
 
 type Tab = 'list' | 'add' | 'settings';
@@ -11,9 +9,9 @@ type Tab = 'list' | 'add' | 'settings';
 export default function App() {
   const [tab, setTab] = useState<Tab>('list');
   const [toast, setToast] = useState('');
-  const [prefill, setPrefill] = useState<{ key: number; values: Partial<FormValues> }>({ key: 0, values: {} });
+  const [cardDb, setCardDb] = useState<CardDb | null>(null);
+  useEffect(() => { loadCardDb().then(setCardDb).catch(() => {}); }, []);
 
-  const knownSets = (useLiveQuery(() => db.cards.orderBy('setCode').uniqueKeys(), []) as string[] | undefined ?? []).filter(Boolean);
   const [lockedSet, setLockedSetState] = useState(() => {
     try { return localStorage.getItem('lockedSet') ?? ''; } catch { return ''; }
   });
@@ -34,14 +32,8 @@ export default function App() {
       </header>
       <main>
         {tab === 'list' && <CollectionList notify={notify} />}
-        {tab === 'add' && (
-          <>
-            <ScanPanel knownSets={knownSets} setLocked={!!lockedSet}
-              onResult={(r) => setPrefill((p) => ({ key: p.key + 1, values: { setCode: lockedSet || r.setCode, number: r.number, rarity: r.rarity } }))} />
-            <CardForm key={prefill.key} initial={prefill.values} onSaved={notify} lockedSet={lockedSet} onLockChange={setLockedSet} />
-          </>
-        )}
-        {tab === 'settings' && <Settings notify={notify} />}
+        {tab === 'add' && <AddPanel cardDb={cardDb} lockedSet={lockedSet} setLockedSet={setLockedSet} notify={notify} />}
+        {tab === 'settings' && <Settings notify={notify} cardDb={cardDb} onCardDb={setCardDb} />}
       </main>
       {toast && <div className="toast">{toast}</div>}
       <nav className="tabs">

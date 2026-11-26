@@ -1,7 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, exportJson, importJson } from '../db';
+import { importCardList, type CardDb } from '../carddb';
 
-export function Settings({ notify }: { notify: (m: string) => void }) {
+export function Settings({ notify, cardDb, onCardDb }: { notify: (m: string) => void; cardDb: CardDb | null; onCardDb: (d: CardDb) => void }) {
   const count = useLiveQuery(() => db.cards.count(), []);
 
   async function doExport() {
@@ -26,7 +27,29 @@ export function Settings({ notify }: { notify: (m: string) => void }) {
     }
   }
 
+  async function doImportCardList(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    try {
+      const d = await importCardList(await f.text());
+      onCardDb(d);
+      notify(`カードリスト ${d.size.toLocaleString()} 枚を読み込みました`);
+    } catch (err) {
+      notify('読み込みに失敗しました: ' + String(err));
+    }
+  }
+
   return (
+    <>
+    <section className="panel">
+      <h2>公式カードリスト</h2>
+      <p>{cardDb ? `${cardDb.size.toLocaleString()} 枚（${new Date(cardDb.list.updatedAt).toLocaleDateString('ja-JP')} 時点）` : 'まだありません'}</p>
+      <p className="hint">公式カード検索から週1回自動で取り込んだものを使います。手元の cards.json を読み込むこともできます。</p>
+      <label className="btn file-btn">カードリスト（cards.json）を読み込む
+        <input type="file" accept="application/json,.json" hidden onChange={doImportCardList} />
+      </label>
+    </section>
     <section className="panel">
       <h2>データ</h2>
       <p>登録しているカード: {count ?? '…'} 種類</p>
@@ -41,5 +64,6 @@ export function Settings({ notify }: { notify: (m: string) => void }) {
         </label>
       </div>
     </section>
+    </>
   );
 }

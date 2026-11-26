@@ -176,9 +176,8 @@ export function CardForm({ initial, editing, onSaved, onCancel, lockedSet = '', 
       </div>
       <div className="grid2">
         <label>種類
-          <select value={v.type} onChange={(e) => set('type', e.target.value)}>
-            {CARD_TYPES.map((t) => <option key={t}>{t}</option>)}
-          </select>
+          <input value={v.type} onChange={(e) => set('type', e.target.value)} list="card-types" />
+          <datalist id="card-types">{CARD_TYPES.map((t) => <option key={t} value={t} />)}</datalist>
         </label>
         <label>種族<input value={v.race} onChange={(e) => set('race', e.target.value)} /></label>
       </div>

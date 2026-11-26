@@ -160,7 +160,8 @@ export function parseCodeText(raw: string, knownSets: string[] = []): ParsedCode
 }
 
 function norm(s: string) {
-  return s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // 先頭の DM はあってもなくても同じパックとみなす（DM25SD1 と 25SD1）
+  return s.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^DM(?=[A-Z0-9])/, '');
 }
 
 function snapToKnown(code: string, known: string[]): string | null {

@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { DEFAULT_CROP, recognizeCode, warmUpOcr, type CropRect, type OcrResult } from '../ocr';
 import { CameraScanner } from './CameraScanner';
+import type { ParsedCode } from '../parse';
 
 interface Props {
   knownSets: string[];
   /** パック記号を固定しているときは、番号だけ読めれば十分 */
   setLocked: boolean;
+  isValid?: (p: ParsedCode) => boolean;
   onResult: (r: OcrResult) => void;
 }
 
-export function ScanPanel({ knownSets, setLocked, onResult }: Props) {
+export function ScanPanel({ knownSets, setLocked, isValid, onResult }: Props) {
   const [mode, setMode] = useState<'idle' | 'camera' | 'photo'>('idle');
   const [src, setSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState<CropRect>(DEFAULT_CROP);
@@ -75,7 +77,7 @@ export function ScanPanel({ knownSets, setLocked, onResult }: Props) {
     setProgress(0);
     try {
       const full = area.w === 1 && area.h === 1;
-      handle(await recognizeCode(imgRef.current, area, { knownSets, goodScore, onProgress: setProgress, targetHeight: full ? 400 : 220 }));
+      handle(await recognizeCode(imgRef.current, area, { knownSets, goodScore, isValid, onProgress: setProgress, targetHeight: full ? 400 : 220 }));
     } catch (err) {
       setError('読み取りに失敗しました: ' + String(err));
     } finally {
@@ -87,7 +89,7 @@ export function ScanPanel({ knownSets, setLocked, onResult }: Props) {
     <section className="panel">
       <h2>カードを読み取る</h2>
       {mode === 'camera' ? (
-        <CameraScanner knownSets={knownSets} goodScore={goodScore} onResult={handle} onClose={() => setMode('idle')} />
+        <CameraScanner knownSets={knownSets} goodScore={goodScore} isValid={isValid} onResult={handle} onClose={() => setMode('idle')} />
       ) : (
         <div className="stack">
           {canCamera && (
@@ -99,7 +101,7 @@ export function ScanPanel({ knownSets, setLocked, onResult }: Props) {
             🖼 写真を撮る / 選ぶ
             <input type="file" accept="image/*" capture="environment" onChange={onFile} hidden />
           </label>
-          {canCamera && <p className="hint">カメラを右下の文字に近づけて、枠いっぱいに文字を入れると自動で読み取ります。</p>}
+          {canCamera && <p className="hint">カードの右下の文字を緑の枠に入れると、自動で読み取ります。</p>}
         </div>
       )}
       {mode === 'photo' && src && (
@@ -118,9 +120,6 @@ export function ScanPanel({ knownSets, setLocked, onResult }: Props) {
         </>
       )}
       {error && <p className="error">{error}</p>}
-      {result && (result.number || result.setCode) && (
-        <p className="ok">読み取り結果: {[result.setCode, result.rarity, result.number].filter(Boolean).join(' ')}（違っていたら下で直してください）</p>
-      )}
       {result && (
         <details className="ocr-debug">
           <summary>読み取った文字: {result.rawText || '（なし）'}</summary>

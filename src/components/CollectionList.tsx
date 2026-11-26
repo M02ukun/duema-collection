@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { CARD_TYPES, CIVILIZATIONS, CIV_COLORS, type Card, type Civilization } from '../types';
 import { CardForm } from './CardForm';
+import { civBg } from './CostBadge';
 
 type SortKey = 'cost' | 'name' | 'createdAt' | 'count' | 'number' | 'power';
 const SORT_LABELS: Record<SortKey, string> = {
@@ -32,6 +33,11 @@ export function CollectionList({ notify }: { notify: (m: string) => void }) {
   const [editing, setEditing] = useState<Card | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
+  const types = useMemo(() => {
+    const all = new Set<string>(CARD_TYPES.filter((t) => t !== 'その他'));
+    for (const c of cards ?? []) for (const t of c.type.split(/\s*\/\s*/)) if (t) all.add(t);
+    return [...all];
+  }, [cards]);
   const sets = useMemo(() => [...new Set((cards ?? []).map((c) => c.setCode).filter(Boolean))].sort(), [cards]);
 
   const list = useMemo(() => {
@@ -45,7 +51,7 @@ export function CollectionList({ notify }: { notify: (m: string) => void }) {
       if (costMin !== '' || costMax !== '') {
         if (c.cost == null || c.cost < min || c.cost > max) return false;
       }
-      if (type && c.type !== type) return false;
+      if (type && !c.type.split(/\s*\/\s*/).includes(type)) return false;
       if (setCode && c.setCode !== setCode) return false;
       if (civMode === 'mono' && c.civilizations.length !== 1) return false;
       if (civMode === 'multi' && c.civilizations.length < 2) return false;
@@ -141,7 +147,7 @@ export function CollectionList({ notify }: { notify: (m: string) => void }) {
               <label>種類
                 <select value={type} onChange={(e) => setType(e.target.value)}>
                   <option value="">すべて</option>
-                  {CARD_TYPES.map((t) => <option key={t}>{t}</option>)}
+                  {types.map((t) => <option key={t}>{t}</option>)}
                 </select>
               </label>
               <label>パック
@@ -191,11 +197,4 @@ export function CollectionList({ notify }: { notify: (m: string) => void }) {
       </ul>
     </>
   );
-}
-
-function civBg(civs: Civilization[]): string {
-  if (!civs.length) return '#bbb';
-  if (civs.length === 1) return CIV_COLORS[civs[0]];
-  const step = 100 / civs.length;
-  return `linear-gradient(135deg, ${civs.map((c, i) => `${CIV_COLORS[c]} ${i * step}% ${(i + 1) * step}%`).join(', ')})`;
 }
