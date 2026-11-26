@@ -92,7 +92,11 @@ export class CardDb {
   }
 
   findByCode(set: string, no: string): MasterCard[] {
-    return this.byCode.get(codeKey(set, no)) ?? [];
+    const hit = this.byCode.get(codeKey(set, no));
+    if (hit) return hit;
+    // "DMX22-b" のように末尾に枝番の英字が付く表記は、枝番なしでも探す
+    const base = normSet(set).replace(/(\d)[A-Z]$/, '$1');
+    return base !== normSet(set) ? this.byCode.get(`${base}#${normNo(no)}`) ?? [] : [];
   }
 
   /** そのパックに入っているカード */
