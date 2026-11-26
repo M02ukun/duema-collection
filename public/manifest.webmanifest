@@ -1,0 +1,10 @@
+{
+  "name": "デュエマ所持カード管理",
+  "short_name": "デュエマ所持",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f5f8",
+  "theme_color": "#1f2a44",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
