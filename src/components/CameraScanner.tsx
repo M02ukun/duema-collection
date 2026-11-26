@@ -12,9 +12,9 @@ interface Props {
 
 /** 画面中央の、横長（約 5:1）の枠を動画に対する割合で作る */
 function makeGuide(vw: number, vh: number): CropRect {
-  // 少し離して撮っても文字が枠に収まるよう、枠は小さめ（横長 6:1）
-  const w = 0.6;
-  const h = Math.min(0.3, (w * vw) / vh / 6);
+  // 狙いやすいよう大きめの枠（横長 3.5:1）。文字が枠の一部でも、実在する番号が読めれば確定する
+  const w = 0.88;
+  const h = Math.min(0.4, (w * vw) / vh / 3.5);
   return { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
 }
 
@@ -83,7 +83,7 @@ export function CameraScanner({ knownSets, goodScore, isValid, onResult, onClose
       if (v && v.videoWidth && !busy.current) {
         busy.current = true;
         try {
-          const r = await recognizeCode(v, guideRef.current, { knownSets, quick: true, targetHeight: 160, goodScore, isValid });
+          const r = await recognizeCode(v, guideRef.current, { knownSets, quick: true, targetHeight: 260, goodScore, isValid });
           setLast(r.rawText);
           // カードリストがあるときは実在する番号が読めたら、無いときは形がそろったら止める
           if ((isValid ? r.valid : r.score >= goodScore) && !stopped.current) {
@@ -114,7 +114,7 @@ export function CameraScanner({ knownSets, goodScore, isValid, onResult, onClose
     snap.height = v.videoHeight;
     snap.getContext('2d')!.drawImage(v, 0, 0);
     while (busy.current) await new Promise((r) => setTimeout(r, 50));
-    const r = await recognizeCode(snap, guideRef.current, { knownSets, targetHeight: 200, goodScore, isValid });
+    const r = await recognizeCode(snap, guideRef.current, { knownSets, targetHeight: 300, goodScore, isValid });
     setManualBusy(false);
     onResult(r);
   }
@@ -139,7 +139,7 @@ export function CameraScanner({ knownSets, goodScore, isValid, onResult, onClose
       <div className="scanner-view">
         <video ref={videoRef} playsInline muted />
         <div className="scanner-guide" style={{ left: `${GUIDE.x * 100}%`, top: `${GUIDE.y * 100}%`, width: `${GUIDE.w * 100}%`, height: `${GUIDE.h * 100}%` }} />
-        <p className="scanner-tip">カードから10〜15cmほど離し、右下の「24RP3 R 19/76」のような文字を枠に入れてください</p>
+        <p className="scanner-tip">カードから10〜15cmほど離し、右下の「24RP3 R 19/76」のような文字が枠のどこかに入るようにしてください</p>
       </div>
       {zoomRange && (
         <label className="zoom-row">ズーム {zoom.toFixed(1)}倍

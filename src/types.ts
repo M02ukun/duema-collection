@@ -38,6 +38,8 @@ export interface Card {
   power: number | null;
   rarity: string;
   memo: string;
+  /** 公式サイトのサムネイル画像ファイル名（公式カードリストから登録したとき） */
+  img?: string;
   /** 所持枚数 */
   count: number;
   createdAt: number;

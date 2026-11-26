@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { addCard, db } from '../db';
-import { normNo, normSet, type CardDb, type MasterCard } from '../carddb';
+import { cardImageUrl, normNo, normSet, type CardDb, type MasterCard } from '../carddb';
 import type { OcrResult } from '../ocr';
 import { CIVILIZATIONS, type Civilization } from '../types';
 import { ScanPanel } from './ScanPanel';
@@ -30,6 +30,7 @@ export async function addMaster(m: MasterCard, n = 1) {
       power: m.power,
       rarity: m.rarity,
       memo: '',
+      img: m.img,
     },
     n,
   );
@@ -144,7 +145,7 @@ export function MasterList({ cards, owned, onAdd, big }: {
         const n = owned?.get(m.id) ?? 0;
         return (
           <li key={m.id}>
-            <CostBadge cost={m.cost} civs={m.civ as Civilization[]} />
+            <CardThumb card={m} fallback={<CostBadge cost={m.cost} civs={m.civ as Civilization[]} />} big={big} />
             <span className="info">
               <span className="name">{m.name}</span>
               <span className="meta">{[m.civ.join('/'), m.type, m.rarity].filter(Boolean).join('・')}</span>
@@ -158,4 +159,12 @@ export function MasterList({ cards, owned, onAdd, big }: {
       })}
     </ul>
   );
+}
+
+/** 公式サイトのカード画像。読み込めないときは代わりの表示を出す */
+export function CardThumb({ card, fallback, big }: { card: { id: string; img?: string; name: string }; fallback: React.ReactNode; big?: boolean }) {
+  const url = cardImageUrl(card);
+  const [failed, setFailed] = useState(false);
+  if (!url || failed) return <>{fallback}</>;
+  return <img className={`thumb ${big ? 'big' : ''}`} src={url} alt={card.name} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
 }

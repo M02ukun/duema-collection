@@ -46,6 +46,9 @@ async function listProducts() {
     .filter((p) => p.value);
 }
 
+/** カードID → 公式サイトのサムネイル画像ファイル名（画像そのものは保存せず、公式サイトの画像を表示する） */
+const thumbs = new Map();
+
 async function listIds(product) {
   const ids = [];
   for (let page = 1; page < 100; page++) {
@@ -57,7 +60,13 @@ async function listIds(product) {
     body.set('pagenum', String(page));
     body.set('samename', 'show');
     const $ = load(await get(`${BASE}/card/`, { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }));
-    const pageIds = $('#cardlist a[data-href]').map((_, a) => $(a).attr('data-href').split('id=')[1]).get();
+    const pageIds = $('#cardlist a[data-href]').map((_, a) => {
+      const id = $(a).attr('data-href').split('id=')[1];
+      // サムネイル画像のファイル名（"dm26bd1-004a.jpg" のように ID と違うことがある）
+      const img = ($(a).find('img').attr('src') ?? '').split('/').pop();
+      if (img) thumbs.set(id, img);
+      return id;
+    }).get();
     const fresh = pageIds.filter((id) => !ids.includes(id));
     ids.push(...fresh);
     const hasNext = $('.wp-pagenavi a').toArray().some((a) => Number($(a).attr('data-page')) > page);
@@ -164,7 +173,10 @@ await pool(limited, async ({ id, product }) => {
   if (++done % 200 === 0) console.log(`  ${done}/${limited.length}`);
 });
 
-for (const c of known.values()) c.name = dedupeName(c.name);
+for (const c of known.values()) {
+  c.name = dedupeName(c.name);
+  if (thumbs.has(c.id)) c.img = thumbs.get(c.id);
+}
 const productMeta = new Map(prev.products.map((p) => [p.value, p]));
 for (const p of products) productMeta.set(p.value, { value: p.value, name: p.name });
 const order = new Map(products.map((p, i) => [p.value, i]));

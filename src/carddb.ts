@@ -22,6 +22,16 @@ export interface MasterCard {
   race: string;
   power: number | null;
   rarity: string;
+  /** 公式サイトのサムネイル画像ファイル名 */
+  img?: string;
+}
+
+const IMG_BASE = 'https://dm.takaratomy.co.jp/wp-content/card/cardthumb/';
+/** 公式サイトにあるカード画像の URL（画像は保存せず、公式サイトのものを表示する） */
+export function cardImageUrl(c: { id: string; img?: string }): string | null {
+  if (c.img) return IMG_BASE + c.img;
+  if (/^dm[a-z0-9]+-[A-Za-z0-9]+$/.test(c.id)) return `${IMG_BASE}${c.id}.jpg`;
+  return null;
 }
 
 export interface CardList {

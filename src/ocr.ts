@@ -204,7 +204,7 @@ export async function recognizeCode(src: Source, crop: CropRect, opts: OcrOption
   const worker = await getWorker(onProgress);
   const { gray, w, h } = cropGray(src, crop, targetHeight);
   const plan: [Variant, PSM][] = quick
-    ? [['gray', PSM.SINGLE_BLOCK], ['adaptive', PSM.SINGLE_BLOCK]]
+    ? [['gray', PSM.SINGLE_BLOCK], ['adaptive', PSM.SPARSE_TEXT]]
     : [
         ['gray', PSM.SINGLE_BLOCK],
         ['adaptive', PSM.SINGLE_BLOCK],

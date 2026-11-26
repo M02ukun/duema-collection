@@ -4,6 +4,7 @@ import { db } from '../db';
 import { CARD_TYPES, CIVILIZATIONS, CIV_COLORS, type Card, type Civilization } from '../types';
 import { CardForm } from './CardForm';
 import { civBg } from './CostBadge';
+import { cardImageUrl } from '../carddb';
 
 type SortKey = 'cost' | 'name' | 'createdAt' | 'count' | 'number' | 'power';
 const SORT_LABELS: Record<SortKey, string> = {
@@ -32,6 +33,13 @@ export function CollectionList({ notify }: { notify: (m: string) => void }) {
   const [desc, setDesc] = useState(false);
   const [editing, setEditing] = useState<Card | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [view, setViewState] = useState<'grid' | 'list'>(() => {
+    try { return localStorage.getItem('view') === 'list' ? 'list' : 'grid'; } catch { return 'grid'; }
+  });
+  const setView = (v: 'grid' | 'list') => {
+    setViewState(v);
+    try { localStorage.setItem('view', v); } catch { /* 保存できなくても問題ない */ }
+  };
 
   const types = useMemo(() => {
     const all = new Set<string>(CARD_TYPES.filter((t) => t !== 'その他'));
@@ -167,6 +175,10 @@ export function CollectionList({ notify }: { notify: (m: string) => void }) {
             {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => <option key={k} value={k}>{SORT_LABELS[k]}</option>)}
           </select>
           <button className="btn small" onClick={() => setDesc((d) => !d)}>{desc ? '↓ 降順' : '↑ 昇順'}</button>
+          <span className="view-toggle">
+            <button className={view === 'grid' ? 'on' : ''} onClick={() => setView('grid')} aria-label="イラストで表示">▦</button>
+            <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')} aria-label="リストで表示">☰</button>
+          </span>
           <span className="summary">{totalKinds}種 / {totalCount}枚</span>
         </div>
       </section>
@@ -174,6 +186,27 @@ export function CollectionList({ notify }: { notify: (m: string) => void }) {
       {cards && cards.length === 0 && (
         <p className="empty">まだカードがありません。「登録」タブから追加してください。</p>
       )}
+      {view === 'grid' ? (
+        <ul className="card-grid">
+          {list.map((c) => {
+            const url = cardImageUrl(c);
+            return (
+              <li key={c.id} className={c.count <= 0 ? 'zero' : ''}>
+                <button className="grid-card" onClick={() => setEditing(c)}>
+                  {url ? (
+                    <img src={url} alt={c.name} loading="lazy" referrerPolicy="no-referrer"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+                  ) : null}
+                  <span className="grid-fallback" style={{ background: civBg(c.civilizations) }}>
+                    <b>{c.cost ?? '-'}</b><span>{c.name}</span>
+                  </span>
+                  <span className="grid-count">×{c.count}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
       <ul className="card-list">
         {list.map((c) => (
           <li key={c.id} className={c.count <= 0 ? 'zero' : ''}>
@@ -195,6 +228,7 @@ export function CollectionList({ notify }: { notify: (m: string) => void }) {
           </li>
         ))}
       </ul>
+      )}
     </>
   );
 }
