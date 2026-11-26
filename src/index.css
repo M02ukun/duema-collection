@@ -66,3 +66,10 @@ input, select { font: inherit; font-size: 16px; color: var(--text); background: 
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(80px + env(safe-area-inset-bottom)); background: #222; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 14px; max-width: 90vw; z-index: 10; }
 .grid2 > *, .grid3 > * { min-width: 0; }
 .grid2 input, .grid2 select, .grid3 input { width: 100%; }
+.scanner { display: flex; flex-direction: column; gap: 8px; }
+.scanner-view { position: relative; border-radius: 10px; overflow: hidden; background: #000; }
+.scanner-view video { display: block; width: 100%; height: auto; }
+.scanner-guide { position: absolute; border: 3px solid #4cd964; border-radius: 6px; box-shadow: 0 0 0 9999px rgba(0,0,0,.45); }
+.scanner-tip { position: absolute; left: 0; right: 0; bottom: 6px; margin: 0; padding: 0 12px; text-align: center; color: #fff; font-size: 12px; text-shadow: 0 1px 2px #000; }
+.scanner-last { word-break: break-all; min-height: 1.4em; }
+input[type=checkbox] { width: 20px; height: 20px; padding: 0; flex: none; accent-color: var(--accent); }

@@ -42,10 +42,17 @@ interface Props {
   editing?: Card;
   onSaved: (msg: string) => void;
   onCancel?: () => void;
+  /** 固定しているパック記号（同じパックを続けて登録するとき用） */
+  lockedSet?: string;
+  onLockChange?: (setCode: string) => void;
 }
 
-export function CardForm({ initial, editing, onSaved, onCancel }: Props) {
-  const [v, setV] = useState<FormValues>({ ...EMPTY_FORM, ...(editing ? cardToForm(editing) : {}), ...initial });
+export function CardForm({ initial, editing, onSaved, onCancel, lockedSet = '', onLockChange }: Props) {
+  const [v, setV] = useState<FormValues>({
+    ...EMPTY_FORM,
+    ...(editing ? cardToForm(editing) : { setCode: lockedSet }),
+    ...Object.fromEntries(Object.entries(initial).filter(([, x]) => x !== '' && x != null)),
+  });
   const [addCount, setAddCount] = useState(1);
   const [ownedCount, setOwnedCount] = useState(editing?.count ?? 0);
   const autofilledId = useRef<string | null>(editing?.id ?? null);
@@ -62,7 +69,7 @@ export function CardForm({ initial, editing, onSaved, onCancel }: Props) {
     db.cards.get(id).then((c) => {
       if (cancelled || !c) return;
       autofilledId.current = id;
-      setV((p) => ({ ...cardToForm(c), setCode: p.setCode, number: p.number }));
+      setV((p) => ({ ...cardToForm(c), setCode: p.setCode, number: p.number, rarity: c.rarity || p.rarity }));
       setOwnedCount(c.count);
     });
     return () => { cancelled = true; };
@@ -111,7 +118,7 @@ export function CardForm({ initial, editing, onSaved, onCancel }: Props) {
     } else {
       await addCard(base, addCount);
       onSaved(`「${base.name}」を ${addCount} 枚登録しました`);
-      setV(EMPTY_FORM);
+      setV({ ...EMPTY_FORM, setCode: lockedSet });
       setAddCount(1);
       setOwnedCount(0);
       autofilledId.current = null;
@@ -131,9 +138,16 @@ export function CardForm({ initial, editing, onSaved, onCancel }: Props) {
       <h2>{editing ? 'カードを編集' : 'カード情報'}</h2>
       {!editing && ownedCount > 0 && <p className="ok">登録済みのカードです（いま {ownedCount} 枚）。内容を自動で入れました。</p>}
       <div className="grid2">
-        <label>パック記号<input value={v.setCode} onChange={(e) => set('setCode', e.target.value)} placeholder="DM24-RP1" autoCapitalize="characters" /></label>
-        <label>番号<input value={v.number} onChange={(e) => set('number', e.target.value)} placeholder="12/77" /></label>
+        <label>パック記号<input value={v.setCode} onChange={(e) => set('setCode', e.target.value)} placeholder="24RP3" autoCapitalize="characters" /></label>
+        <label>番号<input value={v.number} onChange={(e) => set('number', e.target.value)} placeholder="19/76" /></label>
       </div>
+      {!editing && onLockChange && (
+        <label className="check">
+          <input type="checkbox" checked={!!lockedSet && lockedSet === v.setCode}
+            disabled={!v.setCode} onChange={(e) => onLockChange(e.target.checked ? v.setCode : '')} />
+          このパック記号を固定する（同じパックを続けて登録するとき。番号だけ読めればOKになります）
+        </label>
+      )}
       {(v.setCode || v.number || v.name) && (
         <p className="links">
           調べる: <a href="https://dm.takaratomy.co.jp/card/" target="_blank" rel="noreferrer">公式カード検索</a>
