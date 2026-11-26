@@ -105,7 +105,7 @@ async function fetchDetail(id, product) {
     p: product,
     set: pm?.[1] ?? '',
     no: pm?.[2] ?? '',
-    name: sides.map((s) => s.name).filter(Boolean).join(' / '),
+    name: dedupeName(sides.map((s) => s.name).filter(Boolean).join(' / ')),
     cost: num(first.cost),
     costs: sides.length > 1 ? sides.map((s) => num(s.cost)) : undefined,
     civ: civs,
@@ -114,6 +114,11 @@ async function fetchDetail(id, product) {
     power: num(first.power),
     rarity: first.rarity,
   };
+}
+
+/** "A / B / A / B" のように面の名前が重なったものを "A / B" にする */
+function dedupeName(name) {
+  return [...new Set(name.split(/\s+\/\s+/))].join(' / ');
 }
 
 async function pool(items, worker) {
@@ -159,6 +164,7 @@ await pool(limited, async ({ id, product }) => {
   if (++done % 200 === 0) console.log(`  ${done}/${limited.length}`);
 });
 
+for (const c of known.values()) c.name = dedupeName(c.name);
 const productMeta = new Map(prev.products.map((p) => [p.value, p]));
 for (const p of products) productMeta.set(p.value, { value: p.value, name: p.name });
 const order = new Map(products.map((p, i) => [p.value, i]));
