@@ -35,9 +35,26 @@ jobs:
           ARGS="--max-details $MAX_DETAILS"
           if [ -n "$PRODUCTS" ]; then ARGS="$ARGS --products $PRODUCTS"; fi
           node scripts/fetch-cards.mjs $ARGS
+      - name: Keep a copy of the result
+        uses: actions/upload-artifact@v4
+        with:
+          name: cards-json
+          path: public/data/cards.json
+          retention-days: 7
       - name: Commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
-          git add public/data/cards.json
-          git diff --cached --quiet || (git commit -m "カードリストを更新" && git push)
+          # 取得中に main が進んでいても push できるよう、最新の main の上に cards.json だけ載せ直す
+          cp public/data/cards.json "$RUNNER_TEMP/cards.json"
+          for i in 1 2 3 4; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp "$RUNNER_TEMP/cards.json" public/data/cards.json
+            git add public/data/cards.json
+            if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+            git commit -m "カードリストを更新"
+            git push origin HEAD:main && exit 0
+            sleep $((i * 10))
+          done
+          exit 1
