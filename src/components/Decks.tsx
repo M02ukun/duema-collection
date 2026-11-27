@@ -3,9 +3,9 @@ import { db } from '../db';
 import { normName, type CardDb, type MasterCard } from '../carddb';
 import { changeDeckItem, deckLines, deleteDeck, parseDeckText, placeLabel, resolveCard, type DeckLine, type Storage } from '../storage';
 import { newId, type Civilization, type Deck } from '../types';
-import { CardPicker } from './CardPicker';
 import { CardThumb } from './AddPanel';
 import { CostBadge } from './CostBadge';
+import { DeckEditor } from './DeckEditor';
 
 export function Decks({ cardDb, st, openId, setOpenId, notify, onOpenBox }: {
   cardDb: CardDb | null;
@@ -68,7 +68,7 @@ function DeckDetail({ deck, cardDb, st, onBack, notify, onOpenBox }: {
   notify: (m: string) => void;
   onOpenBox: (id: string) => void;
 }) {
-  const [adding, setAdding] = useState(false);
+  const [mode, setMode] = useState<'edit' | 'check'>('edit');
   const [importing, setImporting] = useState(false);
   const [text, setText] = useState('');
   const [unmatched, setUnmatched] = useState<string[]>([]);
@@ -78,7 +78,6 @@ function DeckDetail({ deck, cardDb, st, onBack, notify, onOpenBox }: {
     const cb = resolveCard(b.items[0].cardId, cardDb, st, b.name).cost ?? 99;
     return ca - cb || a.name.localeCompare(b.name, 'ja');
   }), [deck, st, cardDb]);
-  const counts = useMemo(() => new Map(st.deckItems.filter((i) => i.deckId === deck.id).map((i) => [i.cardId, i.count])), [st, deck.id]);
   const total = lines.reduce((s, l) => s + l.need, 0);
   const short = lines.reduce((s, l) => s + l.short, 0);
 
@@ -143,7 +142,6 @@ function DeckDetail({ deck, cardDb, st, onBack, notify, onOpenBox }: {
           {short ? <b className="short">　あと{short}枚足りない</b> : total ? <b className="ok">　全部そろっています</b> : ''}
         </p>
         <div className="row wrap">
-          <button className="btn primary" onClick={() => setAdding((s) => !s)}>{adding ? '探すのをやめる' : '＋ カードを探して入れる'}</button>
           <button className="btn" onClick={() => setImporting((s) => !s)}>リストを貼り付け</button>
           {total > 0 && <button className="btn" onClick={() => copy(listText, 'デッキリスト')}>リストをコピー</button>}
           {short > 0 && <button className="btn" onClick={() => copy(shortText, '足りないカード')}>足りない分をコピー</button>}
@@ -157,14 +155,12 @@ function DeckDetail({ deck, cardDb, st, onBack, notify, onOpenBox }: {
           </div>
         )}
       </section>
-      {adding && cardDb && (
-        <section className="panel">
-          <h2>デッキに入れる</h2>
-          <CardPicker cardDb={cardDb} owned={st.owned} counts={counts} countLabel="デッキに" onChange={change}
-            placeholder="カード名で探す（持っていないカードも入れられます）" />
-        </section>
-      )}
-      <section className="panel">
+      <div className="seg wide">
+        <button className={mode === 'edit' ? 'on' : ''} onClick={() => setMode('edit')}>カードを選ぶ</button>
+        <button className={mode === 'check' ? 'on' : ''} onClick={() => setMode('check')}>不足・置き場所{short ? `（${short}）` : ''}</button>
+      </div>
+      {mode === 'edit' && (cardDb ? <DeckEditor deck={deck} lines={lines} cardDb={cardDb} st={st} onChange={change} /> : <p className="hint">カードリストを読み込んでいます…</p>)}
+      {mode === 'check' && <section className="panel">
         <div className="row">
           <h2 className="grow">カード</h2>
           {short > 0 && <label className="check"><input type="checkbox" checked={onlyShort} onChange={(e) => setOnlyShort(e.target.checked)} /> 足りないものだけ</label>}
@@ -175,7 +171,7 @@ function DeckDetail({ deck, cardDb, st, onBack, notify, onOpenBox }: {
             <DeckRow key={l.name} line={l} cardDb={cardDb} st={st} onChange={change} onOpenBox={onOpenBox} built={deck.built} />
           ))}
         </ul>
-      </section>
+      </section>}
       <section className="panel">
         <button className="btn danger" onClick={async () => {
           if (!confirm(`デッキ「${deck.name}」を削除しますか？（カードの所持枚数はそのまま残ります）`)) return;

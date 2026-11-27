@@ -157,3 +157,27 @@ details.manual > .panel { border: 0; padding: 10px 0 0; }
 .target-box { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; margin-bottom: 10px; border-radius: 10px; background: var(--accent); color: var(--accent-text); font-size: 14px; }
 textarea { width: 100%; font-size: 15px; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); box-sizing: border-box; }
 .ocr-debug img.warped { width: 160px; max-width: 50%; border-radius: 6px; }
+.seg.wide { display: flex; margin: 0 0 10px; }
+.seg.wide button { flex: 1; }
+.deck-pane { position: sticky; top: 0; z-index: 4; max-height: 42vh; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+.deck-pane-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; position: sticky; top: -12px; background: var(--panel); padding: 2px 0 6px; z-index: 1; }
+.deck-pane-head b { font-size: 17px; }
+.deck-pane-head .hint { margin-left: auto; }
+.deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 4px; }
+.deck-cell { position: relative; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 4px; overflow: hidden; }
+.deck-cell .thumb, .deck-cell .cost { width: 100%; height: auto; aspect-ratio: 650 / 908; display: grid; border-radius: 4px; }
+.deck-cell.lacking { outline: 2px solid #d33; outline-offset: -2px; }
+.deck-cell .grid-count { font-size: 11px; padding: 1px 5px; right: 2px; bottom: 2px; }
+.cost-pick { display: flex; flex-wrap: wrap; gap: 4px; }
+.cost-pick button { min-width: 34px; padding: 5px 0; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 14px; cursor: pointer; }
+.cost-pick button.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px 8px; }
+.pick-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pick-cell.in-deck .pick-card { outline: 3px solid var(--accent); outline-offset: -3px; }
+.pick-card { position: relative; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 6px; overflow: hidden; }
+.pick-card .thumb, .pick-card .cost { width: 100%; height: auto; aspect-ratio: 650 / 908; display: grid; border-radius: 6px; }
+.pick-name { font-size: 11px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--text); }
+.pick-meta { font-size: 11px; color: var(--sub); display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+button.link { border: 0; background: none; color: var(--accent); font-size: 11px; padding: 0; cursor: pointer; text-decoration: underline; }
+.pick-variants { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; }
+.pick-variants .group { border-top: 0; padding-top: 0; }
