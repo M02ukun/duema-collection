@@ -160,7 +160,9 @@ export function detectCard(src: Src, prior?: { x: number; y: number; w: number; 
   ];
   const diag = Math.hypot(W, H);
 
-  let best: { score: number; corners: [Pt, Pt, Pt, Pt]; sup: number } | null = null;
+  type Cand = { score: number; corners: [Pt, Pt, Pt, Pt]; sup: number; aErr: number; area: number };
+  let best: Cand | null = null;
+  const all: Cand[] = [];
   for (const L of lefts) for (const R of rights) for (const T of tops) for (const B of bottoms) {
     const tl = cross(L, T), tr = cross(R, T), br = cross(R, B), bl = cross(L, B);
     const wTop = tr.x - tl.x, wBot = br.x - bl.x, hL = bl.y - tl.y, hR = br.y - tr.y;
@@ -178,9 +180,24 @@ export function detectCard(src: Src, prior?: { x: number; y: number; w: number; 
     let score = sup - 1.2 * aErr - 0.3 * persp + 1.0 * Math.min(area, 0.8);
     if (priorCorners) score -= 1.5 * [tl, tr, br, bl].reduce((s2, p, j) => s2 + Math.hypot(p.x - priorCorners[j].x, p.y - priorCorners[j].y), 0) / 4 / diag;
     if (debug) debug.push({ score, sup, aErr, persp, area, corners: [tl, tr, br, bl].map((p) => ({ x: p.x / s, y: p.y / s })) });
-    if (!best || score > best.score) best = { score, corners: [tl, tr, br, bl], sup };
+    const cand: Cand = { score, corners: [tl, tr, br, bl], sup, aErr, area };
+    all.push(cand);
+    if (!best || score > best.score) best = cand;
   }
   if (!best) return null;
+  // カードケース（スクリューダウンなど）に入っていると、ケースの外形もカードと同じような長方形に見える。
+  // 選んだ四角形の内側に、縁がはっきりしたカードの形の四角形があれば、そちらを本物のカードとみなす
+  for (let round = 0; round < 3; round++) {
+    const outer: Cand = best;
+    const ox = (outer.corners[1].x - outer.corners[0].x) * 0.015, oy = (outer.corners[3].y - outer.corners[0].y) * 0.015;
+    const inside = (p: Pt) => p.x > Math.min(outer.corners[0].x, outer.corners[3].x) + ox && p.x < Math.max(outer.corners[1].x, outer.corners[2].x) - ox
+      && p.y > Math.min(outer.corners[0].y, outer.corners[1].y) + oy && p.y < Math.max(outer.corners[2].y, outer.corners[3].y) - oy;
+    const inner = all
+      .filter((c) => c !== outer && c.area >= outer.area * 0.4 && c.area < outer.area * 0.95 && c.aErr < 0.12 && c.sup >= Math.max(0.8, outer.sup - 0.12) && c.corners.every(inside))
+      .sort((a, b) => b.score - a.score)[0];
+    if (!inner) break;
+    best = inner;
+  }
   const k = 1 / s;
   return {
     corners: best.corners.map((p) => ({ x: p.x * k, y: p.y * k })) as [Pt, Pt, Pt, Pt],

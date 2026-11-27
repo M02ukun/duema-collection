@@ -72,6 +72,34 @@ function band(card: HTMLCanvasElement, y0: number, y1: number, invert: boolean, 
   return c;
 }
 
+/**
+ * カード名は「白い文字に黒いふち取り」が多い。白っぽい画素だけを黒い文字として取り出す。
+ * ホロ（キラ）カードでも背景の模様に邪魔されにくい
+ */
+function whiteBand(card: HTMLCanvasElement, x0: number, x1: number, y0: number, y1: number, thr: number): HTMLCanvasElement {
+  const sx = Math.round(card.width * x0), sw = Math.round(card.width * (x1 - x0));
+  const sy = Math.round(card.height * y0), sh = Math.round(card.height * (y1 - y0));
+  const scale = 90 / sh;
+  const pad = 20;
+  const c = document.createElement('canvas');
+  c.width = Math.round(sw * scale) + pad * 2;
+  c.height = Math.round(sh * scale) + pad * 2;
+  const ctx = c.getContext('2d', { willReadFrequently: true })!;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(card, sx, sy, sw, sh, pad, pad, c.width - pad * 2, c.height - pad * 2);
+  const img = ctx.getImageData(0, 0, c.width, c.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const mn = Math.min(d[i], d[i + 1], d[i + 2]), mx = Math.max(d[i], d[i + 1], d[i + 2]);
+    const on = mn > thr && mx - mn < 0.25 * mx;
+    d[i] = d[i + 1] = d[i + 2] = on ? 0 : 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
 const bigrams = (s: string) => {
   const out = new Set<string>();
   for (let i = 0; i < s.length - 1; i++) out.add(s.slice(i, i + 2));
@@ -119,6 +147,7 @@ export class NameIndex {
     const q = normName(text);
     if (q.length < 2) return [];
     const qg = bigrams(q);
+    const qc = new Set(q);
     const hits = new Map<number, number>();
     for (const b of qg) for (const i of this.index.get(b) ?? []) hits.set(i, (hits.get(i) ?? 0) + 1);
     const scored: { i: number; score: number }[] = [];
@@ -126,7 +155,13 @@ export class NameIndex {
       // 名前側の何割が読めているか（行に余計な文字が混ざっても下がりにくいように名前側を重視）
       const recall = common / this.grams[i];
       const precision = common / qg.size;
-      const score = 0.6 * recall + 0.4 * precision;
+      // 1文字ずつでもどれだけ合っているか（読み間違いで2文字の組がくずれても拾えるように）
+      const chars = new Set(this.names[i]);
+      let hit = 0;
+      for (const ch of chars) if (qc.has(ch)) hit++;
+      // 短い名前は1文字ずつだと偶然合いやすいので、文字数が少ないほど割り引く
+      const charRecall = (hit / chars.size) * Math.min(1, chars.size / 5);
+      const score = 0.45 * recall + 0.35 * charRecall + 0.2 * precision;
       if (score >= 0.3) scored.push({ i, score });
     }
     scored.sort((a, b) => b.score - a.score || this.names[a.i].length - this.names[b.i].length);
@@ -177,7 +212,25 @@ export async function recognizeCardByName(
   const top = () => [...best.values()].sort((a, b) => b.score - a.score);
 
   onStage?.('カード名を読み取り中…');
-  await read(band(card, 0, 0.2, false), 1);
+  // 名前の行だけ（左のコストの丸と、上のふりがなを避ける）を白い文字として読む
+  const nameLines: string[] = [];
+  const readName = async (c: HTMLCanvasElement) => {
+    const before = lines.length;
+    await read(c, 1);
+    nameLines.push(...lines.slice(before));
+  };
+  await readName(whiteBand(card, 0.17, 0.95, 0.035, 0.105, 185));
+  if ((top()[0]?.score ?? 0) < 0.8) await readName(whiteBand(card, 0.17, 0.95, 0.03, 0.11, 150));
+  if ((top()[0]?.score ?? 0) < 0.8) await readName(whiteBand(card, 0.17, 0.95, 0.035, 0.105, 215));
+  // 何回か読んだ結果をつなげて、もう一度照合する（それぞれ一部しか読めていなくても合わせれば分かることがある）
+  if (nameLines.length > 1) {
+    for (const m of index.match(nameLines.join(''))) {
+      const sc = m.score * 0.95;
+      const prev = best.get(m.name);
+      if (!prev || prev.score < sc) best.set(m.name, { name: m.name, score: sc, cards: m.cards });
+    }
+  }
+  if ((top()[0]?.score ?? 0) < 0.8) await read(band(card, 0, 0.2, false), 1);
   if ((top()[0]?.score ?? 0) < 0.8) await read(band(card, 0, 0.2, true), 1);
   if ((top()[0]?.score ?? 0) < 0.8) {
     onStage?.('もう少し詳しく読み取り中…');

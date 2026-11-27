@@ -59,8 +59,8 @@ export function readCiv(card: HTMLCanvasElement): Pick<CostCiv, 'civ' | 'civConf
       if (v < 0.2) continue; // カードのふちの黒
       total++;
       if (s < 0.18) {
-        // 灰色は闇（明るすぎる白は数えない）
-        if (v < 0.75) count.闇 += 0.6;
+        // 暗い灰色は闇（銀色の枠や白は数えない）
+        if (v < 0.6) count.闇 += 0.35;
         continue;
       }
       if (s < 0.3) continue;
@@ -103,6 +103,15 @@ export async function readCost(card: HTMLCanvasElement, debug?: unknown[]): Prom
       const r = raw[i * 4], gg = raw[i * 4 + 1], bb = raw[i * 4 + 2];
       const mn = Math.min(r, gg, bb), mx = Math.max(r, gg, bb);
       b[i] = mn > thr && (mx - mn) < 0.3 * mx ? 1 : 0;
+    }
+    variants.push(dropBorderBlobs(b, cw, ch));
+  }
+  // 禁断などの特殊なカードは黄色い数字
+  {
+    const b = new Uint8Array(cw * ch);
+    for (let i = 0; i < b.length; i++) {
+      const { h, s, v } = rgbToHsv(raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2]);
+      b[i] = v > 0.5 && h >= 30 && h < 75 && s > 0.2 ? 1 : 0;
     }
     variants.push(dropBorderBlobs(b, cw, ch));
   }
