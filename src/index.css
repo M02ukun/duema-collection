@@ -104,3 +104,4 @@ details.manual .card-form { border: 0; padding: 10px 0 0; }
 .cand-card .thumb.big { width: 96px; }
 .cand-card .cost { width: 96px; height: 134px; border-radius: 6px; }
 details.manual > .panel { border: 0; padding: 10px 0 0; }
+.scanner-view .frozen { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }

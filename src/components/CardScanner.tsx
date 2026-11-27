@@ -25,6 +25,8 @@ export function CardScanner({ busy, onCapture, onClose }: Props) {
   const streamRef = useRef<MediaStream | null>(null);
   const [guide, setGuide] = useState<CardRect>(cardGuide(9, 16));
   const [error, setError] = useState('');
+  /** 撮影した瞬間の画像（撮影後はカメラを止めてこれを表示する） */
+  const [frozen, setFrozen] = useState<string | null>(null);
 
   useEffect(() => {
     let stopped = false;
@@ -62,20 +64,28 @@ export function CardScanner({ busy, onCapture, onClose }: Props) {
     snap.width = v.videoWidth;
     snap.height = v.videoHeight;
     snap.getContext('2d')!.drawImage(v, 0, 0);
+    // 撮った時点の画像で判別するので、カメラを止めて静止画を表示する（もう枠に合わせ続けなくてよい）
+    setFrozen(snap.toDataURL('image/jpeg', 0.8));
+    v.pause();
     onCapture(snap, guide);
   }
 
   return (
     <div className="scanner">
       <div className="scanner-view">
-        <video ref={videoRef} playsInline muted />
+        <video ref={videoRef} playsInline muted style={frozen ? { visibility: 'hidden' } : undefined} />
+        {frozen && <img className="frozen" src={frozen} alt="撮影した画像" />}
         <div className="scanner-guide card-guide"
           style={{ left: `${guide.x * 100}%`, top: `${guide.y * 100}%`, width: `${guide.w * 100}%`, height: `${guide.h * 100}%` }} />
-        <p className="scanner-tip">カード全体を緑の枠に合わせて撮影してください</p>
+        <p className="scanner-tip">{frozen ? '撮影しました。カメラは動かして大丈夫です' : 'カード全体を緑の枠に合わせて撮影してください'}</p>
       </div>
       {error && <p className="error">{error}</p>}
       <div className="row">
-        <button className="btn primary grow" onClick={capture} disabled={busy}>{busy ? '判別中…' : '📸 撮影して判別'}</button>
+        {frozen && !busy ? (
+          <button className="btn primary grow" onClick={() => { setFrozen(null); videoRef.current?.play(); }}>撮り直す</button>
+        ) : (
+          <button className="btn primary grow" onClick={capture} disabled={busy || !!frozen}>{busy ? '判別中…' : '📸 撮影して判別'}</button>
+        )}
         <button className="btn" onClick={onClose}>閉じる</button>
       </div>
     </div>
