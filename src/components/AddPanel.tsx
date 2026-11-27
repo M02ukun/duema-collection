@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { addCard, db } from '../db';
 import { cardImageUrl, normNo, normSet, type CardDb, type MasterCard } from '../carddb';
 import type { OcrResult } from '../ocr';
-import { CIVILIZATIONS, type Civilization } from '../types';
+import { CIVILIZATIONS } from '../types';
 import { ScanPanel } from './ScanPanel';
 import { CardScanner } from './CardScanner';
 import { cropCard, NameIndex, recognizeCardByName, warmUpNameOcr, type CardRect, type NameRecResult } from '../namerec';
@@ -11,7 +11,7 @@ import { recognizeCode } from '../ocr';
 import { loadFeatures, matchImage } from '../imagerec';
 import { useEffect } from 'react';
 import { CardForm, type FormValues } from './CardForm';
-import { CostBadge } from './CostBadge';
+import { CardGroups } from './CardGroups';
 
 interface Props {
   cardDb: CardDb | null;
@@ -142,10 +142,28 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify }: Props) {
 
   const results = useMemo(() => (cardDb && query ? cardDb.search(query) : []), [cardDb, query]);
 
-  async function add(m: MasterCard) {
-    await addMaster(m);
-    notify(`「${m.name}」を登録しました（${(owned?.get(m.id) ?? 0) + 1}枚目）`);
+  /** イラストごとの −/＋。0枚になっても記録は残す（一覧の「0枚も表示」で見える） */
+  async function change(m: MasterCard, delta: number) {
+    const n = owned?.get(m.id) ?? 0;
+    if (delta > 0) {
+      await addMaster(m, delta);
+      notify(`「${m.name}」（${m.set} ${m.no}）を登録しました（${n + delta}枚）`);
+    } else if (n > 0) {
+      await db.cards.update(m.id, { count: Math.max(0, n + delta), updatedAt: Date.now() });
+      notify(`「${m.name}」（${m.set} ${m.no}）を1枚減らしました（${Math.max(0, n + delta)}枚）`);
+    }
   }
+
+  const photoGroups = useMemo(() => {
+    if (!cardDb || !nameRes) return [];
+    return cardDb.groupByName([...nameRes.exact, ...nameRes.ranked.map((r) => r.card)], nameRes.exact.length ? 3 : 6);
+  }, [cardDb, nameRes]);
+  const photoScore = useMemo(() => new Map((nameRes?.ranked ?? []).map((r) => [r.card.id, r.score])), [nameRes]);
+  const scanGroups = useMemo(
+    () => (cardDb ? cardDb.groupByName(scanHits.exact.length ? scanHits.exact : scanHits.near) : []),
+    [cardDb, scanHits],
+  );
+  const resultGroups = useMemo(() => (cardDb ? cardDb.groupByName(results) : []), [cardDb, results]);
 
   function onScan(r: OcrResult) {
     setScan(r);
@@ -175,24 +193,13 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify }: Props) {
           )}
           {busy && <p className="hint">{stage || '判別中…'}（初回は文字認識データの読み込みに少し時間がかかります）</p>}
           {wholeError && <p className="error">{wholeError}</p>}
-          {nameRes && nameRes.exact.length > 0 && (
+          {nameRes && photoGroups.length > 0 && (
             <>
-              <p className="ok">番号から特定しました</p>
-              <MasterList cards={nameRes.exact} owned={owned} onAdd={add} big />
-            </>
-          )}
-          {nameRes && nameRes.ranked.length > 0 && (
-            <>
-              <p className="hint">{nameRes.exact.length ? 'ほかの候補' : 'このカードですか？ イラストをタップすると1枚登録します（左上ほど有力）'}</p>
-              <div className="cand-grid">
-                {nameRes.ranked.slice(0, nameRes.exact.length ? 4 : 12).map(({ card: m, score }) => (
-                  <button key={m.id} className="cand-card" onClick={() => add(m)} title={`${m.name} ${m.set} ${m.no}`}>
-                    <CardThumb card={m} big fallback={<CostBadge cost={m.cost} civs={m.civ as Civilization[]} />} />
-                    <span className="cand-label">{m.name}</span>
-                    <span>{m.set} {m.no}・{Math.round(score * 100)}点{owned?.get(m.id) ? `・${owned.get(m.id)}枚` : ''}</span>
-                  </button>
-                ))}
-              </div>
+              {nameRes.exact.length > 0
+                ? <p className="ok">番号から特定しました（光っている枠のカード）</p>
+                : <p className="hint">このカードですか？ 上の行ほど有力で、光っている枠が写真に近いイラストです。同名の別イラストは横にスクロールできます。</p>}
+              {cardDb && <CardGroups groups={photoGroups} cardDb={cardDb} owned={owned} onChange={change} highlight
+                note={(m) => (photoScore.has(m.id) && !nameRes.exact.some((e) => e.id === m.id) ? `・${Math.round(photoScore.get(m.id)! * 100)}点` : '')} />}
             </>
           )}
           {nameRes && (
@@ -213,13 +220,13 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify }: Props) {
           {scanHits.exact.length > 0 ? (
             <>
               <h2>見つかりました</h2>
-              <MasterList cards={scanHits.exact} owned={owned} onAdd={add} big />
+              <CardGroups groups={scanGroups} cardDb={cardDb} owned={owned} onChange={change} highlight />
             </>
           ) : (
             <>
               <h2>{scan.number || scan.setCode ? `「${[scannedSet, scan.number].filter(Boolean).join(' ')}」は見つかりませんでした` : '読み取れませんでした'}</h2>
               <p className="hint">番号の読み間違いかもしれません。{scanHits.near.length ? '近い候補から選ぶか、' : ''}下の検索で名前を入れて探してください。</p>
-              {scanHits.near.length > 0 && <MasterList cards={scanHits.near} owned={owned} onAdd={add} />}
+              {scanHits.near.length > 0 && <CardGroups groups={scanGroups} cardDb={cardDb} owned={owned} onChange={change} highlight />}
             </>
           )}
           {scannedSet && (
@@ -238,7 +245,12 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify }: Props) {
           <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
             placeholder="例: ジャシン、ボルシャック、25SD1 2" />
           {query && !results.length && <p className="hint">見つかりませんでした。</p>}
-          {results.length > 0 && <MasterList cards={results} owned={owned} onAdd={add} />}
+          {results.length > 0 && (
+            <>
+              <p className="hint">同じ名前のカード（再録・別イラスト）は1行にまとめています。横にスクロールしてイラストを選び、−/＋で枚数を変えられます。</p>
+              <CardGroups groups={resultGroups} cardDb={cardDb} owned={owned} onChange={change} highlight={/^[A-Za-z0-9-]{3,10}(\s|$)/.test(query.trim())} />
+            </>
+          )}
           <p className="hint">カードリスト: {cardDb.size.toLocaleString()}枚（{new Date(cardDb.list.updatedAt).toLocaleDateString('ja-JP')} 時点）</p>
         </section>
       ) : (
@@ -252,34 +264,6 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify }: Props) {
         <CardForm key={manual?.key ?? 0} initial={manual?.values ?? {}} onSaved={notify} lockedSet={lockedSet} onLockChange={setLockedSet} />
       </details>
     </>
-  );
-}
-
-export function MasterList({ cards, owned, onAdd, big }: {
-  cards: MasterCard[];
-  owned?: Map<string, number>;
-  onAdd: (m: MasterCard) => void;
-  big?: boolean;
-}) {
-  return (
-    <ul className={`card-list master ${big ? 'big' : ''}`}>
-      {cards.map((m) => {
-        const n = owned?.get(m.id) ?? 0;
-        return (
-          <li key={m.id}>
-            <CardThumb card={m} fallback={<CostBadge cost={m.cost} civs={m.civ as Civilization[]} />} big={big} />
-            <span className="info">
-              <span className="name">{m.name}</span>
-              <span className="meta">{[m.civ.join('/'), m.type, m.rarity].filter(Boolean).join('・')}</span>
-              <span className="code">{m.set} {m.no}{n ? `　所持 ${n}枚` : ''}</span>
-            </span>
-            <button className="btn primary add-btn" onClick={() => onAdd(m)} aria-label={`${m.name}を1枚登録`}>
-              {big ? '＋ 登録' : '＋'}
-            </button>
-          </li>
-        );
-      })}
-    </ul>
   );
 }
 

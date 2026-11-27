@@ -73,6 +73,8 @@ export class CardDb {
   readonly sets: string[];
   readonly productName = new Map<string, string>();
   private readonly names: string[];
+  /** 同じ名前のカード（再録・別イラスト）をまとめたもの */
+  readonly byName = new Map<string, MasterCard[]>();
 
   constructor(list: CardList) {
     this.list = list;
@@ -85,6 +87,35 @@ export class CardDb {
     }
     this.sets = [...new Set(list.cards.map((c) => normSet(c.set)))];
     this.names = list.cards.map((c) => normName(c.name));
+    for (const c of list.cards) {
+      const arr = this.byName.get(c.name);
+      if (arr) arr.push(c);
+      else this.byName.set(c.name, [c]);
+    }
+  }
+
+  /** 同じ名前のカード（再録・別イラスト）。新しいものから並べる */
+  sameName(name: string): MasterCard[] {
+    return this.byName.get(name) ?? [];
+  }
+
+  /**
+   * カードを名前ごとにまとめ、それぞれに同名の別イラストを全部くっつける。
+   * first に入っているカードは、そのグループの先頭に並べる。
+   */
+  groupByName(cards: MasterCard[], maxGroups = 30): { name: string; cards: MasterCard[]; first: Set<string> }[] {
+    const groups = new Map<string, { name: string; cards: MasterCard[]; first: Set<string> }>();
+    for (const c of cards) {
+      let g = groups.get(c.name);
+      if (!g) {
+        if (groups.size >= maxGroups) continue;
+        g = { name: c.name, cards: [], first: new Set() };
+        groups.set(c.name, g);
+      }
+      if (!g.first.has(c.id)) { g.first.add(c.id); g.cards.push(c); }
+    }
+    for (const g of groups.values()) for (const c of this.sameName(g.name)) if (!g.first.has(c.id)) g.cards.push(c);
+    return [...groups.values()];
   }
 
   get size() {
@@ -109,7 +140,7 @@ export class CardDb {
    * 名前・番号で検索。"25sd1 2" のようにパック記号と番号の一部でも探せる。
    * 名前が前方一致するものを先に並べる。
    */
-  search(query: string, limit = 60): MasterCard[] {
+  search(query: string, limit = 200): MasterCard[] {
     const q = query.trim();
     if (!q) return [];
     // 「パック記号 番号」形式
@@ -126,16 +157,18 @@ export class CardDb {
     }
     const nq = normName(q);
     if (!nq) return [];
+    const exact: MasterCard[] = [];
     const prefix: MasterCard[] = [];
     const inner: MasterCard[] = [];
     const cards = this.list.cards;
     for (let i = 0; i < cards.length; i++) {
       const idx = this.names[i].indexOf(nq);
-      if (idx === 0) prefix.push(cards[i]);
+      if (idx === 0 && this.names[i].length === nq.length) exact.push(cards[i]);
+      else if (idx === 0) prefix.push(cards[i]);
       else if (idx > 0) inner.push(cards[i]);
       if (prefix.length >= limit) break;
     }
-    return [...prefix, ...inner].slice(0, limit);
+    return [...exact, ...prefix, ...inner].slice(0, limit);
   }
 }
 
