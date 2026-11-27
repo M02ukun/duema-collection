@@ -8,6 +8,7 @@ import { ScanPanel } from './ScanPanel';
 import { CardScanner } from './CardScanner';
 import { cropCard, NameIndex, recognizeCardByName, warmUpNameOcr, type CardRect, type NameRecResult } from '../namerec';
 import { recognizeCode } from '../ocr';
+import { loadFeatures, matchImage } from '../imagerec';
 import { useEffect } from 'react';
 import { CardForm, type FormValues } from './CardForm';
 import { CostBadge } from './CostBadge';
@@ -51,12 +52,13 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify }: Props) {
   const [whole, setWhole] = useState<'idle' | 'camera'>('idle');
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState('');
-  const [nameRes, setNameRes] = useState<(NameRecResult & { exact: MasterCard[] }) | null>(null);
+  const [nameRes, setNameRes] = useState<(NameRecResult & { exact: MasterCard[]; ranked: { card: MasterCard; score: number }[] }) | null>(null);
   const [wholeError, setWholeError] = useState('');
-  useEffect(() => { if (cardDb) warmUpNameOcr(); }, [cardDb]);
+  useEffect(() => { if (cardDb) { warmUpNameOcr(); loadFeatures(); } }, [cardDb]);
+  const byId = useMemo(() => new Map((cardDb?.list.cards ?? []).map((c) => [c.id, c])), [cardDb]);
 
   /** カード全体の画像から判別する。右下の番号が読めればそれで確定、だめならカード名で候補を出す */
-  async function identify(src: HTMLCanvasElement | HTMLImageElement, rect: CardRect) {
+  async function identify(src: HTMLCanvasElement | HTMLImageElement, rect: CardRect, isPhoto = false) {
     if (!cardDb || !nameIndex) return;
     setBusy(true);
     setWholeError('');
@@ -70,9 +72,32 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify }: Props) {
       }).catch(() => null);
       const exact = code?.valid ? cardDb.findByCode(lockedSet || code.setCode, code.number) : [];
       const r = await recognizeCardByName(card, { x: 0, y: 0, w: 1, h: 1 }, nameIndex, setStage);
-      setNameRes({ ...r, exact });
+
+      // イラストの色の配置で照合し、カード名の結果と合わせて順位をつける
+      setStage('イラストを照合中…');
+      const fs = await loadFeatures();
+      const score = new Map<string, { card: MasterCard; name: number; img: number }>();
+      for (const cand of r.candidates) for (const c of cand.cards) {
+        const prev = score.get(c.id);
+        if (!prev || prev.name < cand.score) score.set(c.id, { card: c, name: cand.score, img: 0 });
+      }
+      if (fs) {
+        // 写真から選んだときはカードの位置がわからないので、中央からいくつかの大きさで切り出して試す
+        const crops = isPhoto ? photoCrops(src) : [card];
+        const m = matchImage(crops, fs);
+        for (const t of m.top) {
+          const c = byId.get(t.id);
+          if (c && !score.has(c.id)) score.set(c.id, { card: c, name: 0, img: 0 });
+        }
+        for (const v of score.values()) v.img = Math.max(0, Math.min(1, (m.simOf(v.card.id) - 0.3) / 0.6));
+      }
+      const ranked = [...score.values()]
+        .map((v) => ({ card: v.card, score: fs ? 0.5 * v.name + 0.5 * v.img + (v.name > 0.6 && v.img > 0.6 ? 0.2 : 0) : v.name }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 12);
+      setNameRes({ ...r, exact, ranked });
       setWhole('idle');
-      if (!exact.length && !r.candidates.length) setWholeError('判別できませんでした。明るい場所で、カードが枠いっぱいになるように撮り直してください。');
+      if (!exact.length && !ranked.length) setWholeError('判別できませんでした。明るい場所で、カードが枠いっぱいになるように撮り直してください。');
     } catch (e) {
       setWholeError('読み取りに失敗しました（初回は文字認識データのダウンロードにネット接続が必要です）: ' + String(e));
     } finally {
@@ -86,7 +111,7 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify }: Props) {
     e.target.value = '';
     if (!f) return;
     const img = new Image();
-    img.onload = () => { identify(img, { x: 0, y: 0, w: 1, h: 1 }); URL.revokeObjectURL(img.src); };
+    img.onload = () => { identify(img, { x: 0, y: 0, w: 1, h: 1 }, true); URL.revokeObjectURL(img.src); };
     img.src = URL.createObjectURL(f);
   }
 
@@ -156,22 +181,18 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify }: Props) {
               <MasterList cards={nameRes.exact} owned={owned} onAdd={add} big />
             </>
           )}
-          {nameRes && nameRes.candidates.length > 0 && (
+          {nameRes && nameRes.ranked.length > 0 && (
             <>
-              <p className="hint">{nameRes.exact.length ? 'ほかの候補' : 'このカードですか？ イラストをタップすると1枚登録します'}</p>
-              {nameRes.candidates.slice(0, nameRes.exact.length ? 3 : 6).map((cand) => (
-                <div key={cand.cards[0].id} className="cand">
-                  <div className="cand-name">{cand.cards[0].name}<span className="hint">（一致度 {Math.round(cand.score * 100)}%・{cand.cards.length}種類）</span></div>
-                  <div className="cand-row">
-                    {cand.cards.slice(0, 24).map((m) => (
-                      <button key={m.id} className="cand-card" onClick={() => add(m)} title={`${m.set} ${m.no}`}>
-                        <CardThumb card={m} big fallback={<CostBadge cost={m.cost} civs={m.civ as Civilization[]} />} />
-                        <span>{m.set}<br />{m.no}{owned?.get(m.id) ? ` ・${owned.get(m.id)}枚` : ''}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
+              <p className="hint">{nameRes.exact.length ? 'ほかの候補' : 'このカードですか？ イラストをタップすると1枚登録します（左上ほど有力）'}</p>
+              <div className="cand-grid">
+                {nameRes.ranked.slice(0, nameRes.exact.length ? 4 : 12).map(({ card: m, score }) => (
+                  <button key={m.id} className="cand-card" onClick={() => add(m)} title={`${m.name} ${m.set} ${m.no}`}>
+                    <CardThumb card={m} big fallback={<CostBadge cost={m.cost} civs={m.civ as Civilization[]} />} />
+                    <span className="cand-label">{m.name}</span>
+                    <span>{m.set} {m.no}・{Math.round(score * 100)}点{owned?.get(m.id) ? `・${owned.get(m.id)}枚` : ''}</span>
+                  </button>
+                ))}
+              </div>
             </>
           )}
           {nameRes && (
@@ -268,4 +289,16 @@ export function CardThumb({ card, fallback, big }: { card: { id: string; img?: s
   const [failed, setFailed] = useState(false);
   if (!url || failed) return <>{fallback}</>;
   return <img className={`thumb ${big ? 'big' : ''}`} src={url} alt={card.name} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
+}
+
+/** 写真の中央から、カードの縦横比（63:88）でいくつかの大きさに切り出す */
+function photoCrops(src: HTMLCanvasElement | HTMLImageElement): HTMLCanvasElement[] {
+  const W = src instanceof HTMLImageElement ? src.naturalWidth : src.width;
+  const H = src instanceof HTMLImageElement ? src.naturalHeight : src.height;
+  const aspect = 63 / 88;
+  return [1, 0.85, 0.72, 0.6].map((s) => {
+    let h = H * s, w = h * aspect;
+    if (w > W * s) { w = W * s; h = w / aspect; }
+    return cropCard(src, { x: (W - w) / 2 / W, y: (H - h) / 2 / H, w: w / W, h: h / H }, 650);
+  });
 }
