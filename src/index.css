@@ -95,3 +95,12 @@ details.manual .card-form { border: 0; padding: 10px 0 0; }
 .grid-fallback b { font-size: 22px; }
 .grid-count { position: absolute; right: 4px; bottom: 4px; z-index: 2; background: rgba(0,0,0,.75); color: #fff; font-weight: 700; font-size: 13px; padding: 2px 7px; border-radius: 999px; }
 .detail-img { width: min(240px, 70%); align-self: center; border-radius: 10px; }
+.card-guide { border-radius: 14px; }
+.cand { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 8px; }
+.cand-name { font-weight: 700; }
+.cand-name .hint { font-weight: 400; margin-left: 4px; }
+.cand-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.cand-card { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: 0; padding: 0; color: var(--sub); font-size: 11px; cursor: pointer; }
+.cand-card .thumb.big { width: 96px; }
+.cand-card .cost { width: 96px; height: 134px; border-radius: 6px; }
+details.manual > .panel { border: 0; padding: 10px 0 0; }

@@ -5,6 +5,10 @@ import { cardImageUrl, normNo, normSet, type CardDb, type MasterCard } from '../
 import type { OcrResult } from '../ocr';
 import { CIVILIZATIONS, type Civilization } from '../types';
 import { ScanPanel } from './ScanPanel';
+import { CardScanner } from './CardScanner';
+import { cropCard, NameIndex, recognizeCardByName, warmUpNameOcr, type CardRect, type NameRecResult } from '../namerec';
+import { recognizeCode } from '../ocr';
+import { useEffect } from 'react';
 import { CardForm, type FormValues } from './CardForm';
 import { CostBadge } from './CostBadge';
 
@@ -42,6 +46,49 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify }: Props) {
   const [scan, setScan] = useState<OcrResult | null>(null);
   const [query, setQuery] = useState('');
   const [manual, setManual] = useState<{ key: number; values: Partial<FormValues> } | null>(null);
+
+  const nameIndex = useMemo(() => (cardDb ? new NameIndex(cardDb) : null), [cardDb]);
+  const [whole, setWhole] = useState<'idle' | 'camera'>('idle');
+  const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState('');
+  const [nameRes, setNameRes] = useState<(NameRecResult & { exact: MasterCard[] }) | null>(null);
+  const [wholeError, setWholeError] = useState('');
+  useEffect(() => { if (cardDb) warmUpNameOcr(); }, [cardDb]);
+
+  /** カード全体の画像から判別する。右下の番号が読めればそれで確定、だめならカード名で候補を出す */
+  async function identify(src: HTMLCanvasElement | HTMLImageElement, rect: CardRect) {
+    if (!cardDb || !nameIndex) return;
+    setBusy(true);
+    setWholeError('');
+    setNameRes(null);
+    try {
+      setStage('番号を探しています…');
+      const card = cropCard(src, rect, 1300);
+      const code = await recognizeCode(card, { x: 0, y: 0.84, w: 1, h: 0.16 }, {
+        knownSets, quick: true, targetHeight: 300,
+        isValid: (p) => !!p.number && cardDb.findByCode(lockedSet || p.setCode, p.number).length > 0,
+      }).catch(() => null);
+      const exact = code?.valid ? cardDb.findByCode(lockedSet || code.setCode, code.number) : [];
+      const r = await recognizeCardByName(card, { x: 0, y: 0, w: 1, h: 1 }, nameIndex, setStage);
+      setNameRes({ ...r, exact });
+      setWhole('idle');
+      if (!exact.length && !r.candidates.length) setWholeError('判別できませんでした。明るい場所で、カードが枠いっぱいになるように撮り直してください。');
+    } catch (e) {
+      setWholeError('読み取りに失敗しました（初回は文字認識データのダウンロードにネット接続が必要です）: ' + String(e));
+    } finally {
+      setBusy(false);
+      setStage('');
+    }
+  }
+
+  function onWholePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    const img = new Image();
+    img.onload = () => { identify(img, { x: 0, y: 0, w: 1, h: 1 }); URL.revokeObjectURL(img.src); };
+    img.src = URL.createObjectURL(f);
+  }
 
   const knownSets = useMemo(
     () => [...new Set([...(cardDb?.sets ?? []), ...(ownedSets ?? []).filter(Boolean).map(normSet)])],
@@ -85,7 +132,60 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify }: Props) {
 
   return (
     <>
-      <ScanPanel knownSets={knownSets} setLocked={!!lockedSet} isValid={isValid} onResult={onScan} />
+      {cardDb && (
+        <section className="panel">
+          <h2>カード全体で判別（おすすめ）</h2>
+          {whole === 'camera' ? (
+            <CardScanner busy={busy} onCapture={identify} onClose={() => setWhole('idle')} />
+          ) : (
+            <div className="stack">
+              <button className="btn primary" disabled={busy} onClick={() => { setWhole('camera'); setNameRes(null); setWholeError(''); }}>
+                📷 カメラでカード全体を撮る
+              </button>
+              <label className="btn file-btn">
+                🖼 写真を撮る / 選ぶ（カードが写真いっぱいに写るように）
+                <input type="file" accept="image/*" capture="environment" onChange={onWholePhoto} hidden />
+              </label>
+            </div>
+          )}
+          {busy && <p className="hint">{stage || '判別中…'}（初回は文字認識データの読み込みに少し時間がかかります）</p>}
+          {wholeError && <p className="error">{wholeError}</p>}
+          {nameRes && nameRes.exact.length > 0 && (
+            <>
+              <p className="ok">番号から特定しました</p>
+              <MasterList cards={nameRes.exact} owned={owned} onAdd={add} big />
+            </>
+          )}
+          {nameRes && nameRes.candidates.length > 0 && (
+            <>
+              <p className="hint">{nameRes.exact.length ? 'ほかの候補' : 'このカードですか？ イラストをタップすると1枚登録します'}</p>
+              {nameRes.candidates.slice(0, nameRes.exact.length ? 3 : 6).map((cand) => (
+                <div key={cand.cards[0].id} className="cand">
+                  <div className="cand-name">{cand.cards[0].name}<span className="hint">（一致度 {Math.round(cand.score * 100)}%・{cand.cards.length}種類）</span></div>
+                  <div className="cand-row">
+                    {cand.cards.slice(0, 24).map((m) => (
+                      <button key={m.id} className="cand-card" onClick={() => add(m)} title={`${m.set} ${m.no}`}>
+                        <CardThumb card={m} big fallback={<CostBadge cost={m.cost} civs={m.civ as Civilization[]} />} />
+                        <span>{m.set}<br />{m.no}{owned?.get(m.id) ? ` ・${owned.get(m.id)}枚` : ''}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+          {nameRes && (
+            <details className="ocr-debug">
+              <summary>読み取った文字: {nameRes.lines.slice(0, 6).join(' / ') || '（なし）'}</summary>
+              <img src={nameRes.preview} alt="判別に使った画像" />
+            </details>
+          )}
+        </section>
+      )}
+
+      <details className="panel manual" open={!cardDb}>
+        <summary>右下の番号で読み取る</summary>
+        <ScanPanel knownSets={knownSets} setLocked={!!lockedSet} isValid={isValid} onResult={onScan} />
 
       {cardDb && scan && (
         <section className="panel">
@@ -109,6 +209,7 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify }: Props) {
           )}
         </section>
       )}
+      </details>
 
       {cardDb ? (
         <section className="panel">
