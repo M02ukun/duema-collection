@@ -14,10 +14,13 @@ export interface Group {
  * 同じ名前のカードを1行にまとめ、イラストを横スクロールで選べるようにする。
  * イラストごとに −/＋ で枚数を増減できる。
  */
-export function CardGroups({ groups, cardDb, owned, onChange, highlight, note }: {
+export function CardGroups({ groups, cardDb, owned, counts, countLabel = '所持', onChange, highlight, note }: {
   groups: Group[];
   cardDb: CardDb;
   owned?: Map<string, number>;
+  /** −/＋で増減する枚数（箱やデッキの中の枚数）。省略時は所持枚数 */
+  counts?: Map<string, number>;
+  countLabel?: string;
   onChange: (m: MasterCard, delta: number) => void;
   /** 当たったカードを強調表示する */
   highlight?: boolean;
@@ -27,19 +30,21 @@ export function CardGroups({ groups, cardDb, owned, onChange, highlight, note }:
   return (
     <div className="groups">
       {groups.map((g) => {
-        const total = g.cards.reduce((s, c) => s + (owned?.get(c.id) ?? 0), 0);
+        const cnt = counts ?? owned;
+        const total = g.cards.reduce((s, c) => s + (cnt?.get(c.id) ?? 0), 0);
+        const ownedTotal = counts ? g.cards.reduce((s, c) => s + (owned?.get(c.id) ?? 0), 0) : 0;
         const head = g.cards[0];
         return (
           <div key={g.name} className="group">
             <div className="group-head">
               <span className="cand-label">{g.name}</span>
               <span className="hint">
-                {[head.civ.join('/'), head.cost != null ? `コスト${head.cost}` : '', `${g.cards.length}種類`, total ? `所持${total}枚` : ''].filter(Boolean).join('・')}
+                {[head.civ.join('/'), head.cost != null ? `コスト${head.cost}` : '', `${g.cards.length}種類`, total ? `${countLabel}${total}枚` : '', ownedTotal ? `所持${ownedTotal}枚` : ''].filter(Boolean).join('・')}
               </span>
             </div>
             <div className="cand-row">
               {g.cards.map((m) => {
-                const n = owned?.get(m.id) ?? 0;
+                const n = cnt?.get(m.id) ?? 0;
                 const hit = highlight && g.first.has(m.id);
                 return (
                   <div key={m.id} className={`group-card ${hit ? 'hit' : ''} ${n ? 'owned' : ''}`}>

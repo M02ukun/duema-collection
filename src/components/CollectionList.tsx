@@ -5,6 +5,8 @@ import { CARD_TYPES, CIVILIZATIONS, CIV_COLORS, type Card, type Civilization } f
 import { CardForm } from './CardForm';
 import { civBg } from './CostBadge';
 import { cardImageUrl } from '../carddb';
+import { placeLabel, type Storage } from '../storage';
+import { Places } from './Places';
 
 type SortKey = 'cost' | 'name' | 'createdAt' | 'count' | 'number' | 'power';
 const SORT_LABELS: Record<SortKey, string> = {
@@ -19,7 +21,11 @@ function numberSortKey(c: Card) {
   return { prefix: m?.[1] ?? '', n: m ? Number(m[2]) : 9999 };
 }
 
-export function CollectionList({ notify }: { notify: (m: string) => void }) {
+export function CollectionList({ notify, st, onOpenPlace }: {
+  notify: (m: string) => void;
+  st?: Storage;
+  onOpenPlace?: (kind: 'box' | 'deck', id: string) => void;
+}) {
   const cards = useLiveQuery(() => db.cards.toArray(), []);
   const [q, setQ] = useState('');
   const [civs, setCivs] = useState<Civilization[]>([]);
@@ -29,6 +35,7 @@ export function CollectionList({ notify }: { notify: (m: string) => void }) {
   const [type, setType] = useState('');
   const [setCode, setSetCode] = useState('');
   const [showZero, setShowZero] = useState(false);
+  const [place, setPlace] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('cost');
   const [desc, setDesc] = useState(false);
   const [editing, setEditing] = useState<Card | null>(null);
@@ -55,6 +62,10 @@ export function CollectionList({ notify }: { notify: (m: string) => void }) {
     const max = costMax === '' ? Infinity : Number(costMax);
     const out = cards.filter((c) => {
       if (!showZero && c.count <= 0) return false;
+      if (place && st) {
+        if (place === 'loose') { if (st.looseOf(c.id) <= 0) return false; }
+        else if (!st.placesOf(c.id).some((p) => `${p.kind}:${p.id}` === place)) return false;
+      }
       if (kw && ![c.name, c.race, c.memo, c.setCode, c.number].some((s) => s.toLowerCase().includes(kw))) return false;
       if (costMin !== '' || costMax !== '') {
         if (c.cost == null || c.cost < min || c.cost > max) return false;
@@ -91,18 +102,18 @@ export function CollectionList({ notify }: { notify: (m: string) => void }) {
       return r * dir || collator.compare(a.name, b.name);
     });
     return out;
-  }, [cards, q, civs, civMode, costMin, costMax, type, setCode, showZero, sortKey, desc]);
+  }, [cards, q, civs, civMode, costMin, costMax, type, setCode, showZero, sortKey, desc, place, st]);
 
   const totalKinds = list.length;
   const totalCount = list.reduce((s, c) => s + Math.max(0, c.count), 0);
-  const activeFilters = [q, costMin, costMax, type, setCode].filter(Boolean).length + civs.length + (civMode !== 'any' ? 1 : 0);
+  const activeFilters = [q, costMin, costMax, type, setCode, place].filter(Boolean).length + civs.length + (civMode !== 'any' ? 1 : 0);
 
   async function bump(c: Card, d: number) {
     await db.cards.update(c.id, { count: Math.max(0, c.count + d), updatedAt: Date.now() });
   }
 
   function reset() {
-    setQ(''); setCivs([]); setCivMode('any'); setCostMin(''); setCostMax(''); setType(''); setSetCode('');
+    setQ(''); setCivs([]); setCivMode('any'); setCostMin(''); setCostMax(''); setType(''); setSetCode(''); setPlace('');
   }
 
   if (editing) {
@@ -110,6 +121,7 @@ export function CollectionList({ notify }: { notify: (m: string) => void }) {
       <>
         <CardForm key={editing.id} initial={{}} editing={editing} onCancel={() => setEditing(null)}
           onSaved={(m) => { notify(m); setEditing(null); }} />
+        {st && <div className="panel"><Places st={st} cardId={editing.id} onOpen={onOpenPlace} /></div>}
         <div className="panel">
           <button className="btn danger" onClick={async () => {
             if (!confirm(`「${editing.name}」を削除しますか？`)) return;
@@ -165,6 +177,16 @@ export function CollectionList({ notify }: { notify: (m: string) => void }) {
                 </select>
               </label>
             </div>
+            {st && (st.boxes.length > 0 || st.decks.some((d) => d.built)) && (
+              <label>置き場所
+                <select value={place} onChange={(e) => setPlace(e.target.value)}>
+                  <option value="">すべて</option>
+                  <option value="loose">未整理（箱にもデッキにも入っていない）</option>
+                  {st.boxes.map((b) => <option key={b.id} value={`box:${b.id}`}>📦 {b.name}</option>)}
+                  {st.decks.filter((d) => d.built).map((d) => <option key={d.id} value={`deck:${d.id}`}>🃏 {d.name}</option>)}
+                </select>
+              </label>
+            )}
             <label className="check"><input type="checkbox" checked={showZero} onChange={(e) => setShowZero(e.target.checked)} /> 0枚のカードも表示</label>
             <button className="btn" onClick={reset}>条件をリセット</button>
           </div>
@@ -218,6 +240,7 @@ export function CollectionList({ notify }: { notify: (m: string) => void }) {
                   {[c.civilizations.join('/') || '文明未設定', c.type, c.race, c.power != null ? `${c.power}` : '', c.rarity].filter(Boolean).join('・')}
                 </span>
                 {(c.setCode || c.number) && <span className="code">{c.setCode} {c.number}</span>}
+                {st && st.placesOf(c.id).length > 0 && <span className="code">{st.placesOf(c.id).map(placeLabel).join('　')}</span>}
               </span>
             </button>
             <span className="counter">

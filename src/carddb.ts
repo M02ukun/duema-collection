@@ -75,6 +75,9 @@ export class CardDb {
   private readonly names: string[];
   /** 同じ名前のカード（再録・別イラスト）をまとめたもの */
   readonly byName = new Map<string, MasterCard[]>();
+  readonly byId = new Map<string, MasterCard>();
+  /** 表記ゆれを無くした名前 → 正式な名前 */
+  readonly nameOfNorm = new Map<string, string>();
 
   constructor(list: CardList) {
     this.list = list;
@@ -88,6 +91,8 @@ export class CardDb {
     this.sets = [...new Set(list.cards.map((c) => normSet(c.set)))];
     this.names = list.cards.map((c) => normName(c.name));
     for (const c of list.cards) {
+      this.byId.set(c.id, c);
+      if (!this.nameOfNorm.has(normName(c.name))) this.nameOfNorm.set(normName(c.name), c.name);
       const arr = this.byName.get(c.name);
       if (arr) arr.push(c);
       else this.byName.set(c.name, [c]);

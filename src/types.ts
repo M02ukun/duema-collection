@@ -60,3 +60,43 @@ export function makeCardId(setCode: string, number: string, name: string): strin
   if (sc && no) return `${sc}#${no}`;
   return `manual:${name.trim()}`;
 }
+
+/** カードを入れておく箱（収納ケース）。QRコードに id を入れる */
+export interface Box {
+  id: string;
+  name: string;
+  memo: string;
+  createdAt: number;
+}
+
+/** 箱に入っているカードと枚数。id は `${boxId}|${cardId}` */
+export interface BoxItem {
+  id: string;
+  boxId: string;
+  cardId: string;
+  name: string;
+  count: number;
+}
+
+/** デッキ。built=true なら現物を組んであり、そのカードはこのデッキの中にある */
+export interface Deck {
+  id: string;
+  name: string;
+  built: boolean;
+  memo: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** デッキに入れるカードと枚数。id は `${deckId}|${cardId}`。同名カードはイラスト違いでも同じカードとして数える */
+export interface DeckItem {
+  id: string;
+  deckId: string;
+  cardId: string;
+  name: string;
+  count: number;
+}
+
+export function newId(): string {
+  return Math.random().toString(36).slice(2, 10);
+}

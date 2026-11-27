@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { addCard, db } from '../db';
+import { db } from '../db';
+import { addMaster, changeBoxItem } from '../storage';
+import type { Box } from '../types';
 import { cardImageUrl, normNo, normSet, type CardDb, type MasterCard } from '../carddb';
 import type { OcrResult } from '../ocr';
-import { CIVILIZATIONS } from '../types';
 import { ScanPanel } from './ScanPanel';
 import { CardScanner } from './CardScanner';
 import { cropCard, NameIndex, recognizeCardByName, warmUpNameOcr, type CardRect, type NameRecResult } from '../namerec';
@@ -18,30 +19,14 @@ interface Props {
   lockedSet: string;
   setLockedSet: (s: string) => void;
   notify: (m: string) => void;
+  /** 登録したカードを入れる箱 */
+  targetBox?: Box | null;
+  onClearTarget?: () => void;
 }
 
-/** 公式カードリストのカードを、所持カードとして1枚追加する */
-export async function addMaster(m: MasterCard, n = 1) {
-  await addCard(
-    {
-      id: m.id,
-      setCode: m.set,
-      number: m.no,
-      name: m.name,
-      cost: m.cost,
-      civilizations: CIVILIZATIONS.filter((c) => m.civ.includes(c)),
-      type: m.type,
-      race: m.race,
-      power: m.power,
-      rarity: m.rarity,
-      memo: '',
-      img: m.img,
-    },
-    n,
-  );
-}
+export { addMaster } from '../storage';
 
-export function AddPanel({ cardDb, lockedSet, setLockedSet, notify }: Props) {
+export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, onClearTarget }: Props) {
   const owned = useLiveQuery(async () => new Map((await db.cards.toArray()).map((c) => [c.id, c.count])), []);
   const ownedSets = useLiveQuery(() => db.cards.orderBy('setCode').uniqueKeys(), []) as string[] | undefined;
   const [scan, setScan] = useState<OcrResult | null>(null);
@@ -147,9 +132,11 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify }: Props) {
     const n = owned?.get(m.id) ?? 0;
     if (delta > 0) {
       await addMaster(m, delta);
-      notify(`「${m.name}」（${m.set} ${m.no}）を登録しました（${n + delta}枚）`);
+      if (targetBox) await changeBoxItem(targetBox.id, m, delta, false);
+      notify(`「${m.name}」（${m.set} ${m.no}）を登録しました（${n + delta}枚${targetBox ? `・箱「${targetBox.name}」に入れました` : ''}）`);
     } else if (n > 0) {
       await db.cards.update(m.id, { count: Math.max(0, n + delta), updatedAt: Date.now() });
+      if (targetBox) await changeBoxItem(targetBox.id, m, delta, false);
       notify(`「${m.name}」（${m.set} ${m.no}）を1枚減らしました（${Math.max(0, n + delta)}枚）`);
     }
   }
@@ -175,6 +162,12 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify }: Props) {
 
   return (
     <>
+      {targetBox && (
+        <div className="target-box">
+          <span>📦 登録したカードは箱「<b>{targetBox.name}</b>」に入れます</span>
+          <button className="btn small" onClick={onClearTarget}>やめる</button>
+        </div>
+      )}
       {cardDb && (
         <section className="panel">
           <h2>カード全体で判別（おすすめ）</h2>
