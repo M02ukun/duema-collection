@@ -18,3 +18,4 @@ const files = [
 ];
 for (const [from, to] of files) copyFileSync(join(nm, from), join(out, to));
 console.log('copied tesseract assets to public/tesseract');
+

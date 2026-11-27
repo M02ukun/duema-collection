@@ -10,6 +10,7 @@ import { CardScanner } from './CardScanner';
 import { cropCard, NameIndex, recognizeCardByName, warmUpNameOcr, type CardRect, type NameRecResult } from '../namerec';
 import { recognizeCode } from '../ocr';
 import { loadFeatures, matchImage } from '../imagerec';
+import { matchEmbed, warmUpEmbed } from '../embed';
 import { detectCard, warpCard } from '../cardDetect';
 import { useEffect } from 'react';
 import { CardForm, type FormValues } from './CardForm';
@@ -41,7 +42,7 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
   const [nameRes, setNameRes] = useState<(NameRecResult & { exact: MasterCard[]; ranked: { card: MasterCard; score: number }[] }) | null>(null);
   const [wholeError, setWholeError] = useState('');
   const [warped, setWarped] = useState('');
-  useEffect(() => { if (cardDb) { warmUpNameOcr(); loadFeatures(); } }, [cardDb]);
+  useEffect(() => { if (cardDb) { warmUpNameOcr(); loadFeatures(); warmUpEmbed(); } }, [cardDb]);
   const byId = useMemo(() => new Map((cardDb?.list.cards ?? []).map((c) => [c.id, c])), [cardDb]);
 
   /** カード全体の画像から判別する。右下の番号が読めればそれで確定、だめならカード名で候補を出す */
@@ -68,23 +69,40 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
       // イラストの色の配置で照合し、カード名の結果と合わせて順位をつける
       setStage('イラストを照合中…');
       const fs = await loadFeatures();
-      const score = new Map<string, { card: MasterCard; name: number; img: number }>();
+      const score = new Map<string, { card: MasterCard; name: number; img: number; ai: number }>();
       for (const cand of r.candidates) for (const c of cand.cards) {
         const prev = score.get(c.id);
-        if (!prev || prev.name < cand.score) score.set(c.id, { card: c, name: cand.score, img: 0 });
+        if (!prev || prev.name < cand.score) score.set(c.id, { card: c, name: cand.score, img: 0, ai: 0 });
       }
-      if (fs) {
-        // 写真から選んだときはカードの位置がわからないので、中央からいくつかの大きさで切り出して試す
-        const crops = isPhoto && !found ? photoCrops(src) : [card];
-        const m = matchImage(crops, fs);
-        for (const t of m.top) {
-          const c = byId.get(t.id);
-          if (c && !score.has(c.id)) score.set(c.id, { card: c, name: 0, img: 0 });
+      // 写真から選んで輪郭が見つからなかったときは、中央からいくつかの大きさで切り出して試す
+      const crops = isPhoto && !found ? photoCrops(src) : [card];
+      const addTop = (ids: string[]) => {
+        for (const id of ids) {
+          const c = byId.get(id);
+          if (c && !score.has(c.id)) score.set(c.id, { card: c, name: 0, img: 0, ai: 0 });
         }
-        for (const v of score.values()) v.img = Math.max(0, Math.min(1, (m.simOf(v.card.id) - 0.3) / 0.6));
+      };
+      let simImg: ((id: string) => number) | null = null;
+      if (fs) {
+        const m = matchImage(crops, fs);
+        addTop(m.top.map((t) => t.id));
+        simImg = m.simOf;
+      }
+      // 画像認識AI（Googleレンズのような方式）で照合する
+      setStage('AIでイラストを照合中…（初回はAIのダウンロードに少し時間がかかります）');
+      const em = await matchEmbed(crops).catch((e) => { console.warn(e); return null; });
+      if (em) addTop(em.top.map((t) => t.id));
+      for (const v of score.values()) {
+        if (simImg) v.img = Math.max(0, Math.min(1, (simImg(v.card.id) - 0.3) / 0.6));
+        if (em) v.ai = Math.max(0, Math.min(1, (em.simOf(v.card.id) - 0.3) / 0.55));
       }
       const ranked = [...score.values()]
-        .map((v) => ({ card: v.card, score: fs ? 0.5 * v.name + 0.5 * v.img + (v.name > 0.6 && v.img > 0.6 ? 0.2 : 0) : v.name }))
+        .map((v) => ({
+          card: v.card,
+          score: em
+            ? 0.35 * v.name + 0.1 * v.img + 0.55 * v.ai + (v.name > 0.6 && v.ai > 0.6 ? 0.2 : 0)
+            : fs ? 0.5 * v.name + 0.5 * v.img + (v.name > 0.6 && v.img > 0.6 ? 0.2 : 0) : v.name,
+        }))
         .sort((a, b) => b.score - a.score)
         .slice(0, 12);
       setNameRes({ ...r, exact, ranked });
