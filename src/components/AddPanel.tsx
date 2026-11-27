@@ -99,7 +99,8 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
       if (em) addTop(em.top.map((t) => t.id));
       for (const v of score.values()) {
         if (simImg) v.img = Math.max(0, Math.min(1, (simImg(v.card.id) - 0.3) / 0.6));
-        if (em) v.ai = Math.max(0, Math.min(1, (em.simOf(v.card.id) - 0.3) / 0.55));
+        // AIの似ている度合いは、どのカードでもそれなりに高く出るので、いちばん似ているカードとの差で見る
+        if (em) v.ai = Math.max(0, Math.min(1, 1 - (em.top[0].sim - em.simOf(v.card.id)) / 0.12));
       }
       const ranked = [...score.values()]
         .map((v) => ({
