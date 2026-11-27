@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useBackLayer } from '../history';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { CARD_TYPES, CIVILIZATIONS, CIV_COLORS, type Card, type Civilization } from '../types';
@@ -39,6 +40,7 @@ export function CollectionList({ notify, st, onOpenPlace }: {
   const [sortKey, setSortKey] = useState<SortKey>('cost');
   const [desc, setDesc] = useState(false);
   const [editing, setEditing] = useState<Card | null>(null);
+  useBackLayer(!!editing, () => setEditing(null));
   const [showFilters, setShowFilters] = useState(false);
   const [view, setViewState] = useState<'grid' | 'list'>(() => {
     try { return localStorage.getItem('view') === 'list' ? 'list' : 'grid'; } catch { return 'grid'; }

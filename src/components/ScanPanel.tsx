@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useBackLayer } from '../history';
 import { DEFAULT_CROP, recognizeCode, warmUpOcr, type CropRect, type OcrResult } from '../ocr';
 import { CameraScanner } from './CameraScanner';
 import type { ParsedCode } from '../parse';
@@ -19,6 +20,7 @@ export function ScanPanel({ knownSets, setLocked, isValid, onResult }: Props) {
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<OcrResult | null>(null);
   const [error, setError] = useState('');
+  useBackLayer(mode === 'camera', () => setMode('idle'));
   const imgRef = useRef<HTMLImageElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef<{ x: number; y: number } | null>(null);

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useBackLayer } from '../history';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { addMaster, changeBoxItem } from '../storage';
@@ -43,6 +44,7 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
   const [stage, setStage] = useState('');
   const [nameRes, setNameRes] = useState<(NameRecResult & { exact: MasterCard[]; ranked: { card: MasterCard; score: number }[] }) | null>(null);
   const [wholeError, setWholeError] = useState('');
+  useBackLayer(whole === 'camera', () => setWhole('idle'));
   const [warped, setWarped] = useState('');
   const [costCiv, setCostCiv] = useState<CostCiv | null>(null);
   useEffect(() => { if (cardDb) { warmUpNameOcr(); loadFeatures(); warmUpEmbed(); warmUpCostCiv(); } }, [cardDb]);
