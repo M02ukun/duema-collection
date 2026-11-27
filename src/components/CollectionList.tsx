@@ -181,8 +181,8 @@ export function CollectionList({ notify, st, onOpenPlace }: {
               <label>置き場所
                 <select value={place} onChange={(e) => setPlace(e.target.value)}>
                   <option value="">すべて</option>
-                  <option value="loose">未整理（箱にもデッキにも入っていない）</option>
-                  {st.boxes.map((b) => <option key={b.id} value={`box:${b.id}`}>箱: {b.name}</option>)}
+                  <option value="loose">未整理</option>
+                  {st.boxes.map((b) => <option key={b.id} value={`box:${b.id}`}>ストレージ: {b.name}</option>)}
                   {st.decks.filter((d) => d.built).map((d) => <option key={d.id} value={`deck:${d.id}`}>デッキ: {d.name}</option>)}
                 </select>
               </label>

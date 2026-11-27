@@ -13,11 +13,11 @@ type Tab = 'list' | 'add' | 'box' | 'deck' | 'settings';
 const TABS: [Tab, string, () => React.JSX.Element][] = [
   ['list', 'コレクション', IconCollection],
   ['add', '登録', IconCamera],
-  ['box', '箱', IconBox],
+  ['box', 'ストレージ', IconBox],
   ['deck', 'デッキ', IconDeck],
   ['settings', '設定', IconSettings],
 ];
-const TITLES: Record<Tab, string> = { list: 'コレクション', add: 'カードを登録', box: '箱', deck: 'デッキ', settings: '設定' };
+const TITLES: Record<Tab, string> = { list: 'コレクション', add: 'カード登録', box: 'ストレージ', deck: 'デッキ', settings: '設定' };
 
 /** QRコードのURL（#box=xxxx）から開く箱 */
 function boxFromHash() {

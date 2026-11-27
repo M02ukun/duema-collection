@@ -26,7 +26,7 @@ export function Boxes({ cardDb, st, openId, setOpenId, notify, onRegisterInto }:
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
-    const n = name.trim() || `箱${st.boxes.length + 1}`;
+    const n = name.trim() || `ストレージ${st.boxes.length + 1}`;
     const id = newId();
     await db.boxes.put({ id, name: n, memo: '', createdAt: Date.now() });
     setName('');
@@ -36,8 +36,8 @@ export function Boxes({ cardDb, st, openId, setOpenId, notify, onRegisterInto }:
   if (openId && !open) {
     return (
       <section className="panel">
-        <p>この箱はこの端末に登録されていません。</p>
-        <button className="btn" onClick={() => setOpenId(null)}>箱の一覧へ</button>
+        <p>このストレージはこの端末にありません</p>
+        <button className="btn" onClick={() => setOpenId(null)}>ストレージ一覧へ</button>
       </section>
     );
   }
@@ -46,10 +46,10 @@ export function Boxes({ cardDb, st, openId, setOpenId, notify, onRegisterInto }:
   return (
     <>
       <form className="panel row" onSubmit={create}>
-        <input className="grow" value={name} onChange={(e) => setName(e.target.value)} placeholder="新しい箱の名前" />
+        <input className="grow" value={name} onChange={(e) => setName(e.target.value)} placeholder="新しいストレージの名前" />
         <button className="btn primary" type="submit">追加</button>
       </form>
-      {!st.boxes.length && <div className="empty-state"><IconBox />箱を追加すると、QRコードで中身を確認できます</div>}
+      {!st.boxes.length && <div className="empty-state"><IconBox />QRコードで中身を確認できます</div>}
       {st.boxes.length > 0 && (
         <ul className="place-list">
           {st.boxes.map((b) => {
@@ -105,7 +105,7 @@ function BoxDetail({ box, cardDb, st, onBack, notify, onRegisterInto }: {
 
   async function change(m: MasterCard, d: number) {
     const n = await changeBoxItem(box.id, m, d);
-    notify(`${m.name}（箱に${n}枚）`);
+    notify(`${m.name}（ストレージに${n}枚）`);
   }
 
   async function downloadQr() {
@@ -128,9 +128,9 @@ function BoxDetail({ box, cardDb, st, onBack, notify, onRegisterInto }: {
 
   return (
     <>
-      <button className="back-link" onClick={onBack}><IconBack />箱</button>
+      <button className="back-link" onClick={onBack}><IconBack />ストレージ</button>
       <section className="panel">
-        <input className="title-input" defaultValue={box.name} aria-label="箱の名前"
+        <input className="title-input" defaultValue={box.name} aria-label="ストレージの名前"
           onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== box.name) db.boxes.update(box.id, { name: v }); }} />
         <p className="hint">{groups.length}種 · {total}枚</p>
         <div className="action-row">
@@ -142,21 +142,21 @@ function BoxDetail({ box, cardDb, st, onBack, notify, onRegisterInto }: {
           <div className="qr">
             <img src={qr} alt={`${box.name} のQRコード`} />
             <b>{box.name}</b>
-            <p className="hint">スマホのカメラで読み取るとこの箱を開きます</p>
+            <p className="hint">スマホのカメラで読み取るとこのストレージを開きます</p>
             <button className="btn primary" onClick={downloadQr}>画像を保存</button>
           </div>
         )}
       </section>
       {adding && cardDb && (
         <section className="panel">
-          <CardPicker cardDb={cardDb} owned={st.owned} counts={counts} countLabel="箱に" onChange={change} ownedOnly
+          <CardPicker cardDb={cardDb} owned={st.owned} counts={counts} countLabel="収納" onChange={change} ownedOnly
             note={(m) => { const l = st.looseOf(m.id); return l > 0 ? ` · 未整理${l}` : ''; }} />
         </section>
       )}
       <section className="panel">
         <p className="section-label">中身</p>
         {groups.length ? (
-          cardDb ? <CardGroups groups={groups} cardDb={cardDb} owned={st.owned} counts={counts} countLabel="箱に" onChange={change} />
+          cardDb ? <CardGroups groups={groups} cardDb={cardDb} owned={st.owned} counts={counts} countLabel="収納" onChange={change} />
             : <ul>{items.map((i) => <li key={i.id}>{i.name} ×{i.count}</li>)}</ul>
         ) : <p className="hint">空です</p>}
       </section>
@@ -166,7 +166,7 @@ function BoxDetail({ box, cardDb, st, onBack, notify, onRegisterInto }: {
           await deleteBox(box.id);
           notify(`${box.name} を削除しました`);
           onBack();
-        }}>箱を削除</button>
+        }}>ストレージを削除</button>
       </section>
     </>
   );
