@@ -1,5 +1,5 @@
 import type { CardDb, MasterCard } from '../carddb';
-import type { Civilization } from '../types';
+import { CIV_COLORS, type Civilization } from '../types';
 import { CardThumb } from './AddPanel';
 import { CostBadge } from './CostBadge';
 
@@ -38,8 +38,9 @@ export function CardGroups({ groups, cardDb, owned, counts, countLabel = '所持
           <div key={g.name} className="group">
             <div className="group-head">
               <span className="cand-label">{g.name}</span>
-              <span className="hint">
-                {[head.civ.join('/'), head.cost != null ? `コスト${head.cost}` : '', `${g.cards.length}種類`, total ? `${countLabel}${total}枚` : '', ownedTotal ? `所持${ownedTotal}枚` : ''].filter(Boolean).join('・')}
+              <span className="group-meta">
+                {head.civ.map((c) => <i key={c} className="civ-dot" style={{ background: CIV_COLORS[c as Civilization] }} title={c} />)}
+                {[head.cost != null ? `コスト${head.cost}` : '', g.cards.length > 1 ? `${g.cards.length}種` : '', total ? `${countLabel}${total}` : '', ownedTotal ? `所持${ownedTotal}` : ''].filter(Boolean).join(' · ')}
               </span>
             </div>
             <div className="cand-row">
@@ -48,7 +49,7 @@ export function CardGroups({ groups, cardDb, owned, counts, countLabel = '所持
                 const hit = highlight && g.first.has(m.id);
                 return (
                   <div key={m.id} className={`group-card ${hit ? 'hit' : ''} ${n ? 'owned' : ''}`}>
-                    <button className="cand-card" onClick={() => onChange(m, 1)} title={`${m.name} ${m.set} ${m.no}（タップで1枚登録）`}>
+                    <button className="cand-card" onClick={() => onChange(m, 1)} title={`${m.name} ${m.set} ${m.no}`}>
                       <CardThumb card={m} big fallback={<CostBadge cost={m.cost} civs={m.civ as Civilization[]} />} />
                       {n > 0 && <span className="grid-count">×{n}</span>}
                     </button>

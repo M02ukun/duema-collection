@@ -211,7 +211,7 @@ export async function recognizeCardByName(
   }
   const top = () => [...best.values()].sort((a, b) => b.score - a.score);
 
-  onStage?.('カード名を読み取り中…');
+  onStage?.('名前を読み取っています…');
   // 名前の行だけ（左のコストの丸と、上のふりがなを避ける）を白い文字として読む
   const nameLines: string[] = [];
   const readName = async (c: HTMLCanvasElement) => {
@@ -233,7 +233,7 @@ export async function recognizeCardByName(
   if ((top()[0]?.score ?? 0) < 0.8) await read(band(card, 0, 0.2, false), 1);
   if ((top()[0]?.score ?? 0) < 0.8) await read(band(card, 0, 0.2, true), 1);
   if ((top()[0]?.score ?? 0) < 0.8) {
-    onStage?.('もう少し詳しく読み取り中…');
+    onStage?.('名前を読み取っています…');
     await read(band(card, 0.44, 0.64, false), 0.95);
   }
   if ((top()[0]?.score ?? 0) < 0.6) await read(band(card, 0, 1, false, 1), 0.85);

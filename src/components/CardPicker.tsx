@@ -31,7 +31,7 @@ export function CardPicker({ cardDb, owned, counts, countLabel, onChange, note, 
       {ownedOnly !== undefined && (
         <label className="check"><input type="checkbox" checked={onlyOwned} onChange={(e) => setOnlyOwned(e.target.checked)} /> 持っているカードだけ</label>
       )}
-      {query && !groups.length && <p className="hint">見つかりませんでした。</p>}
+      {query && !groups.length && <p className="hint">該当なし</p>}
       {groups.length > 0 && (
         <CardGroups groups={groups} cardDb={cardDb} owned={owned} counts={counts} countLabel={countLabel} onChange={onChange} note={note} />
       )}

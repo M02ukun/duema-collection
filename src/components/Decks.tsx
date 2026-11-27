@@ -6,6 +6,7 @@ import { newId, type Civilization, type Deck } from '../types';
 import { CardThumb } from './AddPanel';
 import { CostBadge } from './CostBadge';
 import { DeckEditor } from './DeckEditor';
+import { IconBack, IconChevron, IconDeck } from './Icons';
 
 export function Decks({ cardDb, st, openId, setOpenId, notify, onOpenBox }: {
   cardDb: CardDb | null;
@@ -31,14 +32,11 @@ export function Decks({ cardDb, st, openId, setOpenId, notify, onOpenBox }: {
 
   return (
     <>
-      <section className="panel">
-        <h2>デッキ</h2>
-        <p className="hint">組みたいデッキを作ると、あと何が何枚足りないかと、持っている分がどの箱にあるかが出ます。現物を組んだら「組んである」にすると、そのカードはデッキの中にあるものとして数えます。</p>
-        <form className="row" onSubmit={create}>
-          <input className="grow" value={name} onChange={(e) => setName(e.target.value)} placeholder="新しいデッキの名前" />
-          <button className="btn primary" type="submit">作る</button>
-        </form>
-      </section>
+      <form className="panel row" onSubmit={create}>
+        <input className="grow" value={name} onChange={(e) => setName(e.target.value)} placeholder="新しいデッキの名前" />
+        <button className="btn primary" type="submit">追加</button>
+      </form>
+      {!st.decks.length && <div className="empty-state"><IconDeck />デッキを作ると、足りないカードと置き場所が分かります</div>}
       {st.decks.length > 0 && (
         <ul className="place-list">
           {st.decks.map((d) => {
@@ -48,8 +46,12 @@ export function Decks({ cardDb, st, openId, setOpenId, notify, onOpenBox }: {
             return (
               <li key={d.id}>
                 <button onClick={() => setOpenId(d.id)}>
-                  <span className="name">🃏 {d.name} <span className={`badge ${d.built ? 'on' : ''}`}>{d.built ? '組んである' : '組みたい'}</span></span>
-                  <span className="hint">{total}枚{short ? <b className="short">・あと{short}枚足りない</b> : total ? '・全部そろっています' : ''}</span>
+                  <span className="place-icon"><IconDeck /></span>
+                  <span className="place-text">
+                    <span className="name">{d.name} <span className={`badge ${d.built ? 'on' : ''}`}>{d.built ? '組んである' : '組みたい'}</span></span>
+                    <span className="hint">{total}/40{short ? <b className="short"> · 不足{short}</b> : total ? ' · そろっている' : ''}</span>
+                  </span>
+                  <span className="chev"><IconChevron /></span>
                 </button>
               </li>
             );
@@ -116,7 +118,7 @@ function DeckDetail({ deck, cardDb, st, onBack, notify, onOpenBox }: {
       added += r.count;
     }
     setUnmatched(miss);
-    notify(`${added}枚を追加しました${miss.length ? `（${miss.length}行は見つかりませんでした）` : ''}`);
+    notify(`${added}枚を追加${miss.length ? ` · ${miss.length}行は該当なし` : ''}`);
     if (!miss.length) { setText(''); setImporting(false); }
     else setText(miss.join('\n'));
   }
@@ -129,43 +131,36 @@ function DeckDetail({ deck, cardDb, st, onBack, notify, onOpenBox }: {
 
   return (
     <>
+      <button className="back-link" onClick={onBack}><IconBack />デッキ</button>
       <section className="panel">
-        <button className="btn small" onClick={onBack}>← デッキの一覧</button>
         <input className="title-input" defaultValue={deck.name} aria-label="デッキの名前"
           onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== deck.name) db.decks.update(deck.id, { name: v }); }} />
         <div className="seg">
           <button className={!deck.built ? 'on' : ''} onClick={() => db.decks.update(deck.id, { built: false })}>組みたい</button>
           <button className={deck.built ? 'on' : ''} onClick={() => db.decks.update(deck.id, { built: true })}>組んである</button>
         </div>
-        <p className="deck-summary">
-          {total}枚{total !== 40 && total > 0 ? `（40枚まであと${40 - total}）` : ''}
-          {short ? <b className="short">　あと{short}枚足りない</b> : total ? <b className="ok">　全部そろっています</b> : ''}
-        </p>
-        <div className="row wrap">
-          <button className="btn" onClick={() => setImporting((s) => !s)}>リストを貼り付け</button>
-          {total > 0 && <button className="btn" onClick={() => copy(listText, 'デッキリスト')}>リストをコピー</button>}
-          {short > 0 && <button className="btn" onClick={() => copy(shortText, '足りないカード')}>足りない分をコピー</button>}
+        <div className="action-row">
+          <button className={`btn ${importing ? 'primary' : ''}`} onClick={() => setImporting((s) => !s)}>貼り付け</button>
+          {total > 0 && <button className="btn" onClick={() => copy(listText, 'デッキリスト')}>コピー</button>}
+          {short > 0 && <button className="btn" onClick={() => copy(shortText, '不足リスト')}>不足をコピー</button>}
         </div>
         {importing && (
           <div className="stack">
             <textarea rows={8} value={text} onChange={(e) => setText(e.target.value)}
-              placeholder={'1行に1種類ずつ。例:\n4 ボルシャック・ドラゴン\nボルメテウス・ホワイト・ドラゴン ×2'} />
-            {unmatched.length > 0 && <p className="error">見つからなかったカードを残しています。名前を直してもう一度追加してください。</p>}
-            <button className="btn primary" onClick={doImport} disabled={!text.trim()}>デッキに追加</button>
+              placeholder={'4 ボルシャック・ドラゴン\n2 ボルメテウス・ホワイト・ドラゴン'} />
+            {unmatched.length > 0 && <p className="error">上の行は見つかりませんでした</p>}
+            <button className="btn primary" onClick={doImport} disabled={!text.trim()}>追加</button>
           </div>
         )}
       </section>
       <div className="seg wide">
         <button className={mode === 'edit' ? 'on' : ''} onClick={() => setMode('edit')}>カードを選ぶ</button>
-        <button className={mode === 'check' ? 'on' : ''} onClick={() => setMode('check')}>不足・置き場所{short ? `（${short}）` : ''}</button>
+        <button className={mode === 'check' ? 'on' : ''} onClick={() => setMode('check')}>不足・置き場所{short ? ` ${short}` : ''}</button>
       </div>
-      {mode === 'edit' && (cardDb ? <DeckEditor deck={deck} lines={lines} cardDb={cardDb} st={st} onChange={change} /> : <p className="hint">カードリストを読み込んでいます…</p>)}
+      {mode === 'edit' && (cardDb ? <DeckEditor deck={deck} lines={lines} cardDb={cardDb} st={st} onChange={change} /> : <p className="progress-line"><span className="spinner" />読み込み中…</p>)}
       {mode === 'check' && <section className="panel">
-        <div className="row">
-          <h2 className="grow">カード</h2>
-          {short > 0 && <label className="check"><input type="checkbox" checked={onlyShort} onChange={(e) => setOnlyShort(e.target.checked)} /> 足りないものだけ</label>}
-        </div>
-        {!lines.length && <p className="hint">まだカードがありません。「カードを探して入れる」か「リストを貼り付け」で追加してください。</p>}
+        {short > 0 && <label className="check"><input type="checkbox" checked={onlyShort} onChange={(e) => setOnlyShort(e.target.checked)} /> 不足のみ</label>}
+        {!lines.length && <p className="hint">カードがありません</p>}
         <ul className="deck-lines">
           {lines.filter((l) => !onlyShort || l.short).map((l) => (
             <DeckRow key={l.name} line={l} cardDb={cardDb} st={st} onChange={change} onOpenBox={onOpenBox} built={deck.built} />
@@ -174,11 +169,11 @@ function DeckDetail({ deck, cardDb, st, onBack, notify, onOpenBox }: {
       </section>}
       <section className="panel">
         <button className="btn danger" onClick={async () => {
-          if (!confirm(`デッキ「${deck.name}」を削除しますか？（カードの所持枚数はそのまま残ります）`)) return;
+          if (!confirm(`「${deck.name}」を削除しますか？ カードの所持枚数は変わりません。`)) return;
           await deleteDeck(deck.id);
-          notify(`デッキ「${deck.name}」を削除しました`);
+          notify(`${deck.name} を削除しました`);
           onBack();
-        }}>このデッキを削除</button>
+        }}>デッキを削除</button>
       </section>
     </>
   );
@@ -210,10 +205,10 @@ function DeckRow({ line: l, cardDb, st, onChange, onOpenBox, built }: {
       <div className="deck-info">
         <span className="name">{l.name}</span>
         <span className="meta">
-          必要{l.need}・所持{l.owned}
-          {l.usedElsewhere.map((u) => `・「${u.name}」で${u.count}使用`).join('')}
+          必要{l.need} · 所持{l.owned}
+          {l.usedElsewhere.map((u) => ` · ${u.name}で${u.count}`).join('')}
         </span>
-        {l.short > 0 ? <b className="short">あと{l.short}枚</b> : <span className="ok">{built ? 'OK' : 'そろっています'}</span>}
+        {l.short > 0 ? <b className="short">不足{l.short}</b> : <span className="ok">OK</span>}
         {!built && l.boxes.length > 0 && (
           <span className="places">
             {l.boxes.map((p) => <button key={p.id} className="chip" onClick={() => onOpenBox(p.id)}>{placeLabel(p)}</button>)}

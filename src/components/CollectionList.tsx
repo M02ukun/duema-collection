@@ -182,8 +182,8 @@ export function CollectionList({ notify, st, onOpenPlace }: {
                 <select value={place} onChange={(e) => setPlace(e.target.value)}>
                   <option value="">すべて</option>
                   <option value="loose">未整理（箱にもデッキにも入っていない）</option>
-                  {st.boxes.map((b) => <option key={b.id} value={`box:${b.id}`}>📦 {b.name}</option>)}
-                  {st.decks.filter((d) => d.built).map((d) => <option key={d.id} value={`deck:${d.id}`}>🃏 {d.name}</option>)}
+                  {st.boxes.map((b) => <option key={b.id} value={`box:${b.id}`}>箱: {b.name}</option>)}
+                  {st.decks.filter((d) => d.built).map((d) => <option key={d.id} value={`deck:${d.id}`}>デッキ: {d.name}</option>)}
                 </select>
               </label>
             )}
@@ -206,7 +206,7 @@ export function CollectionList({ notify, st, onOpenPlace }: {
       </section>
 
       {cards && cards.length === 0 && (
-        <p className="empty">まだカードがありません。「登録」タブから追加してください。</p>
+        <p className="empty">カードがありません</p>
       )}
       {view === 'grid' ? (
         <ul className="card-grid">

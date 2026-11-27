@@ -7,8 +7,17 @@ import { Boxes } from './components/Boxes';
 import { Decks } from './components/Decks';
 import { useStorage } from './storage';
 import type { Box } from './types';
+import { IconBox, IconCamera, IconCollection, IconDeck, IconSettings } from './components/Icons';
 
 type Tab = 'list' | 'add' | 'box' | 'deck' | 'settings';
+const TABS: [Tab, string, () => React.JSX.Element][] = [
+  ['list', 'コレクション', IconCollection],
+  ['add', '登録', IconCamera],
+  ['box', '箱', IconBox],
+  ['deck', 'デッキ', IconDeck],
+  ['settings', '設定', IconSettings],
+];
+const TITLES: Record<Tab, string> = { list: 'コレクション', add: 'カードを登録', box: '箱', deck: 'デッキ', settings: '設定' };
 
 /** QRコードのURL（#box=xxxx）から開く箱 */
 function boxFromHash() {
@@ -51,7 +60,9 @@ export default function App() {
   return (
     <div className="app">
       <header>
-        <h1>デュエマ所持カード</h1>
+        <span className="logo" aria-hidden />
+        <h1>{TITLES[tab]}</h1>
+        {st && tab === 'list' && <span className="head-note">{st.cards.filter((c) => c.count > 0).length}種 / {st.cards.reduce((n, c) => n + Math.max(0, c.count), 0)}枚</span>}
       </header>
       <main>
         {tab === 'list' && <CollectionList notify={notify} st={st} onOpenPlace={(k, id) => { if (k === 'box') { openBoxAt(id); setTab('box'); } else { setOpenDeck(id); setTab('deck'); } }} />}
@@ -65,11 +76,11 @@ export default function App() {
       </main>
       {toast && <div className="toast">{toast}</div>}
       <nav className="tabs">
-        <button className={tab === 'list' ? 'on' : ''} onClick={() => setTab('list')}>📚<span>一覧</span></button>
-        <button className={tab === 'add' ? 'on' : ''} onClick={() => setTab('add')}>📷<span>登録</span></button>
-        <button className={tab === 'box' ? 'on' : ''} onClick={() => setTab('box')}>📦<span>箱</span></button>
-        <button className={tab === 'deck' ? 'on' : ''} onClick={() => setTab('deck')}>🃏<span>デッキ</span></button>
-        <button className={tab === 'settings' ? 'on' : ''} onClick={() => setTab('settings')}>⚙️<span>データ</span></button>
+        {TABS.map(([key, label, Icon]) => (
+          <button key={key} className={tab === key ? 'on' : ''} onClick={() => setTab(key)} aria-current={tab === key ? 'page' : undefined}>
+            <Icon /><span>{label}</span>
+          </button>
+        ))}
       </nav>
     </div>
   );

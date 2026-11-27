@@ -66,8 +66,8 @@ export function DeckEditor({ deck, lines, cardDb, st, onChange }: {
       <section className="panel deck-pane">
         <div className="deck-pane-head">
           <b className={total > 40 ? 'short' : ''}>{total} / 40枚</b>
-          {short > 0 ? <span className="short">あと{short}枚足りない</span> : total > 0 ? <span className="ok">そろっています</span> : null}
-          <span className="hint">タップで1枚減らす</span>
+          {short > 0 ? <span className="short">不足{short}</span> : total > 0 ? <span className="ok">OK</span> : null}
+          <span className="hint">タップで減らす</span>
         </div>
         {deckCards.length ? (
           <div className="deck-grid">
@@ -82,11 +82,11 @@ export function DeckEditor({ deck, lines, cardDb, st, onChange }: {
               );
             })}
           </div>
-        ) : <p className="hint">下でカードを探して、タップするとデッキに入ります。</p>}
+        ) : <p className="hint">空です</p>}
       </section>
 
       <section className="panel">
-        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="カード名で探す（空でも文明・コストで探せます）" />
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="カード名" />
         <div className="civ-toggle">
           {CIVILIZATIONS.map((c) => (
             <button key={c} className={civs.includes(c) ? 'on' : ''} style={{ '--civ': CIV_COLORS[c] } as React.CSSProperties}
@@ -99,8 +99,7 @@ export function DeckEditor({ deck, lines, cardDb, st, onChange }: {
           ))}
         </div>
         <label className="check"><input type="checkbox" checked={onlyOwned} onChange={(e) => setOnlyOwned(e.target.checked)} /> 持っているカードだけ</label>
-        {results.length > 0 && <p className="hint">タップでデッキに1枚追加。「イラスト」で別イラストを選べます。</p>}
-        <div className="pick-grid">
+                <div className="pick-grid">
           {results.map((m) => {
             const inDeck = countByName.get(normName(m.name)) ?? 0;
             const own = st.ownedByName.get(normName(m.name)) ?? 0;
@@ -127,7 +126,7 @@ export function DeckEditor({ deck, lines, cardDb, st, onChange }: {
             );
           })}
         </div>
-        {(q || civs.length > 0 || cost !== '') && !results.length && <p className="hint">見つかりませんでした。</p>}
+        {(q || civs.length > 0 || cost !== '') && !results.length && <p className="hint">該当なし</p>}
       </section>
     </>
   );

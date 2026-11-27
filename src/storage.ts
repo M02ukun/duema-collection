@@ -150,7 +150,7 @@ function buildStorage(cards: Card[], boxes: Box[], decks: Deck[], boxItems: BoxI
 }
 
 export function placeLabel(p: Place) {
-  return `${p.kind === 'box' ? '📦' : '🃏'}${p.name} ${p.count}枚`;
+  return `${p.name} ${p.count}枚`;
 }
 
 /** デッキの不足を名前ごとに計算する */

@@ -32,7 +32,7 @@ export function ScanPanel({ knownSets, setLocked, isValid, onResult }: Props) {
     setResult(r);
     setMode((m) => (m === 'camera' ? 'idle' : m));
     if (!r.number && !r.setCode) {
-      setError('番号を読み取れませんでした。もう一度試すか、下のフォームに直接入力してください。');
+      setError('番号を読み取れませんでした');
     } else {
       setError('');
     }
@@ -101,12 +101,12 @@ export function ScanPanel({ knownSets, setLocked, isValid, onResult }: Props) {
             🖼 写真を撮る / 選ぶ
             <input type="file" accept="image/*" capture="environment" onChange={onFile} hidden />
           </label>
-          {canCamera && <p className="hint">カードの右下の文字を緑の枠に入れると、自動で読み取ります。</p>}
+          {canCamera && <p className="hint">右下の番号を枠に入れると自動で読み取ります</p>}
         </div>
       )}
       {mode === 'photo' && src && (
         <>
-          <p className="hint">右下の文字を指でなぞって囲んでください。右下だけを近くで撮った写真なら「写真全体で読む」が使えます。</p>
+          <p className="hint">右下の番号を指で囲む</p>
           <div className="crop-box" ref={boxRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
             <img ref={imgRef} src={src} alt="撮影したカード" draggable={false} />
             <div className="crop-rect" style={{ left: `${crop.x * 100}%`, top: `${crop.y * 100}%`, width: `${crop.w * 100}%`, height: `${crop.h * 100}%` }} />

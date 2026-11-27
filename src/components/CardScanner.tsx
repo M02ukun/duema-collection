@@ -77,7 +77,7 @@ export function CardScanner({ busy, onCapture, onClose }: Props) {
         {frozen && <img className="frozen" src={frozen} alt="撮影した画像" />}
         <div className="scanner-guide card-guide"
           style={{ left: `${guide.x * 100}%`, top: `${guide.y * 100}%`, width: `${guide.w * 100}%`, height: `${guide.h * 100}%` }} />
-        <p className="scanner-tip">{frozen ? '撮影しました。カメラは動かして大丈夫です' : 'カード全体を緑の枠に合わせて撮影してください'}</p>
+        <p className="scanner-tip">{frozen ? '撮影しました' : '枠に合わせて撮影'}</p>
       </div>
       {error && <p className="error">{error}</p>}
       <div className="row">

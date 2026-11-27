@@ -139,7 +139,7 @@ export function CameraScanner({ knownSets, goodScore, isValid, onResult, onClose
       <div className="scanner-view">
         <video ref={videoRef} playsInline muted />
         <div className="scanner-guide" style={{ left: `${GUIDE.x * 100}%`, top: `${GUIDE.y * 100}%`, width: `${GUIDE.w * 100}%`, height: `${GUIDE.h * 100}%` }} />
-        <p className="scanner-tip">カードから10〜15cmほど離し、右下の「24RP3 R 19/76」のような文字が枠のどこかに入るようにしてください</p>
+        <p className="scanner-tip">右下の番号を枠に入れる</p>
       </div>
       {zoomRange && (
         <label className="zoom-row">ズーム {zoom.toFixed(1)}倍

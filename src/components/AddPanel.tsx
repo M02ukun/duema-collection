@@ -16,6 +16,7 @@ import { detectCard, warpCard } from '../cardDetect';
 import { useEffect } from 'react';
 import { CardForm, type FormValues } from './CardForm';
 import { CardGroups } from './CardGroups';
+import { IconCamera, IconCheck, IconImage, IconSearch } from './Icons';
 
 interface Props {
   cardDb: CardDb | null;
@@ -54,16 +55,16 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
     setWholeError('');
     setNameRes(null);
     try {
-      setStage('カードの輪郭を探しています…');
+      setStage('カードを切り出しています…');
       // カードの四隅が見つかれば、まっすぐに直して切り出す。見つからなければ枠（写真なら全体）で切り出す
       const det = detectCard(src, isPhoto ? undefined : rect);
       const found = !!det && det.confidence >= 0.5;
       const card = found ? warpCard(src, det!.corners, 1300) : cropCard(src, rect, 1300);
       setWarped(card.toDataURL('image/jpeg', 0.7));
-      setStage('左上のコストと色を読んでいます…');
+      setStage('コストを読み取っています…');
       const cc = await readCostCiv(card).catch(() => null);
       setCostCiv(cc);
-      setStage('番号を探しています…');
+      setStage('番号を読み取っています…');
       const code = await recognizeCode(card, { x: 0, y: 0.84, w: 1, h: 0.16 }, {
         knownSets, quick: true, targetHeight: 300,
         isValid: (p) => !!p.number && cardDb.findByCode(lockedSet || p.setCode, p.number).length > 0,
@@ -72,7 +73,7 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
       const r = await recognizeCardByName(card, { x: 0, y: 0, w: 1, h: 1 }, nameIndex, setStage);
 
       // イラストの色の配置で照合し、カード名の結果と合わせて順位をつける
-      setStage('イラストを照合中…');
+      setStage('イラストを照合しています…');
       const fs = await loadFeatures();
       const score = new Map<string, { card: MasterCard; name: number; img: number; ai: number }>();
       for (const cand of r.candidates) for (const c of cand.cards) {
@@ -94,7 +95,7 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
         simImg = m.simOf;
       }
       // 画像認識AI（Googleレンズのような方式）で照合する
-      setStage('AIでイラストを照合中…（初回はAIのダウンロードに少し時間がかかります）');
+      setStage('イラストを照合しています…');
       const em = await matchEmbed(crops).catch((e) => { console.warn(e); return null; });
       if (em) addTop(em.top.map((t) => t.id));
       for (const v of score.values()) {
@@ -115,9 +116,10 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
         .slice(0, 12);
       setNameRes({ ...r, exact, ranked });
       setWhole('idle');
-      if (!exact.length && !ranked.length) setWholeError('判別できませんでした。明るい場所で、カードが枠いっぱいになるように撮り直してください。');
+      if (!exact.length && !ranked.length) setWholeError('見つかりませんでした。明るい場所で撮り直してみてください');
     } catch (e) {
-      setWholeError('読み取りに失敗しました（初回は文字認識データのダウンロードにネット接続が必要です）: ' + String(e));
+      setWholeError('読み取りに失敗しました');
+      console.error(e);
     } finally {
       setBusy(false);
       setStage('');
@@ -166,11 +168,11 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
     if (delta > 0) {
       await addMaster(m, delta);
       if (targetBox) await changeBoxItem(targetBox.id, m, delta, false);
-      notify(`「${m.name}」（${m.set} ${m.no}）を登録しました（${n + delta}枚${targetBox ? `・箱「${targetBox.name}」に入れました` : ''}）`);
+      notify(`${m.name} を追加（${n + delta}枚）${targetBox ? ` → ${targetBox.name}` : ''}`);
     } else if (n > 0) {
       await db.cards.update(m.id, { count: Math.max(0, n + delta), updatedAt: Date.now() });
       if (targetBox) await changeBoxItem(targetBox.id, m, delta, false);
-      notify(`「${m.name}」（${m.set} ${m.no}）を1枚減らしました（${Math.max(0, n + delta)}枚）`);
+      notify(`${m.name} を減らしました（${Math.max(0, n + delta)}枚）`);
     }
   }
 
@@ -178,7 +180,6 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
     if (!cardDb || !nameRes) return [];
     return cardDb.groupByName([...nameRes.exact, ...nameRes.ranked.map((r) => r.card)], nameRes.exact.length ? 3 : 6);
   }, [cardDb, nameRes]);
-  const photoScore = useMemo(() => new Map((nameRes?.ranked ?? []).map((r) => [r.card.id, r.score])), [nameRes]);
   const scanGroups = useMemo(
     () => (cardDb ? cardDb.groupByName(scanHits.exact.length ? scanHits.exact : scanHits.near) : []),
     [cardDb, scanHits],
@@ -197,98 +198,87 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
     <>
       {targetBox && (
         <div className="target-box">
-          <span>📦 登録したカードは箱「<b>{targetBox.name}</b>」に入れます</span>
-          <button className="btn small" onClick={onClearTarget}>やめる</button>
+          <span>登録先: <b>{targetBox.name}</b></span>
+          <button className="btn small" onClick={onClearTarget}>解除</button>
         </div>
       )}
       {cardDb && (
         <section className="panel">
-          <h2>カード全体で判別（おすすめ）</h2>
           {whole === 'camera' ? (
             <CardScanner busy={busy} onCapture={identify} onClose={() => setWhole('idle')} />
           ) : (
-            <div className="stack">
+            <div className="big-actions">
               <button className="btn primary" disabled={busy} onClick={() => { setWhole('camera'); setNameRes(null); setWholeError(''); }}>
-                📷 カメラでカード全体を撮る
+                <IconCamera />カメラで撮る
               </button>
               <label className="btn file-btn">
-                🖼 写真を撮る / 選ぶ（カードが写真いっぱいに写るように）
+                <IconImage />写真から選ぶ
                 <input type="file" accept="image/*" capture="environment" onChange={onWholePhoto} hidden />
               </label>
             </div>
           )}
-          {busy && <p className="hint">{stage || '判別中…'}（初回は文字認識データの読み込みに少し時間がかかります）</p>}
+          {busy && <p className="progress-line"><span className="spinner" />{stage || '判別中…'}</p>}
           {wholeError && <p className="error">{wholeError}</p>}
           {nameRes && photoGroups.length > 0 && (
             <>
-              {nameRes.exact.length > 0
-                ? <p className="ok">番号から特定しました（光っている枠のカード）</p>
-                : <p className="hint">このカードですか？ 上の行ほど有力で、光っている枠が写真に近いイラストです。同名の別イラストは横にスクロールできます。</p>}
-              {cardDb && <CardGroups groups={photoGroups} cardDb={cardDb} owned={owned} onChange={change} highlight
-                note={(m) => (photoScore.has(m.id) && !nameRes.exact.some((e) => e.id === m.id) ? `・${Math.round(photoScore.get(m.id)! * 100)}点` : '')} />}
+              {nameRes.exact.length > 0 ? <p className="match-badge"><IconCheck />番号で一致</p> : <p className="section-label">候補</p>}
+              {cardDb && <CardGroups groups={photoGroups} cardDb={cardDb} owned={owned} onChange={change} highlight />}
             </>
           )}
           {nameRes && (
             <details className="ocr-debug">
-              <summary>読み取った文字: {nameRes.lines.slice(0, 6).join(' / ') || '（なし）'}</summary>
-              {costCiv && <p className="hint">左上のコスト: {costCiv.cost ?? '読めず'}・枠の色: {costCiv.civConfidence > 0.3 ? Object.entries(costCiv.civ).filter(([, v]) => v >= 0.5).map(([k]) => k).join('/') : 'はっきりしない'}</p>}
-              {warped && <><p className="hint">切り出したカード（ずれていたら撮り直してください）</p><img className="warped" src={warped} alt="切り出したカード" /></>}
-              <img src={nameRes.preview} alt="判別に使った画像" />
+              <summary>読み取り結果</summary>
+              <p className="hint">名前: {nameRes.lines.slice(0, 6).join(' / ') || '—'}</p>
+              {costCiv && <p className="hint">コスト: {costCiv.cost ?? '—'}　文明: {costCiv.civConfidence > 0.3 ? Object.entries(costCiv.civ).filter(([, v]) => v >= 0.5).map(([k]) => k).join('/') : '—'}</p>}
+              {warped && <img className="warped" src={warped} alt="切り出したカード" />}
             </details>
           )}
         </section>
       )}
 
+      {cardDb ? (
+        <section className="panel">
+          <div className="search-box">
+            <IconSearch />
+            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="カード名・パック番号で検索" />
+          </div>
+          {query && !results.length && <p className="hint">該当するカードがありません</p>}
+          {results.length > 0 && (
+            <CardGroups groups={resultGroups} cardDb={cardDb} owned={owned} onChange={change} highlight={/^[A-Za-z0-9-]{3,10}(\s|$)/.test(query.trim())} />
+          )}
+        </section>
+      ) : (
+        <section className="panel">
+          <p className="hint">カードリストを読み込めていません。手入力で登録できます。</p>
+        </section>
+      )}
+
       <details className="panel manual" open={!cardDb}>
-        <summary>右下の番号で読み取る</summary>
+        <summary>番号で読み取る</summary>
         <ScanPanel knownSets={knownSets} setLocked={!!lockedSet} isValid={isValid} onResult={onScan} />
 
       {cardDb && scan && (
         <section className="panel">
           {scanHits.exact.length > 0 ? (
-            <>
-              <h2>見つかりました</h2>
-              <CardGroups groups={scanGroups} cardDb={cardDb} owned={owned} onChange={change} highlight />
-            </>
+            <CardGroups groups={scanGroups} cardDb={cardDb} owned={owned} onChange={change} highlight />
           ) : (
             <>
-              <h2>{scan.number || scan.setCode ? `「${[scannedSet, scan.number].filter(Boolean).join(' ')}」は見つかりませんでした` : '読み取れませんでした'}</h2>
-              <p className="hint">番号の読み間違いかもしれません。{scanHits.near.length ? '近い候補から選ぶか、' : ''}下の検索で名前を入れて探してください。</p>
+              <h2>{scan.number || scan.setCode ? `「${[scannedSet, scan.number].filter(Boolean).join(' ')}」は見つかりません` : '読み取れませんでした'}</h2>
               {scanHits.near.length > 0 && <CardGroups groups={scanGroups} cardDb={cardDb} owned={owned} onChange={change} highlight />}
             </>
           )}
           {scannedSet && (
             <label className="check">
               <input type="checkbox" checked={!!lockedSet} onChange={(e) => setLockedSet(e.target.checked ? scannedSet : '')} />
-              パック「{lockedSet || scannedSet}」を固定する（同じパックを続けて登録するとき。番号だけ読めればOKになります）
+              パック「{lockedSet || scannedSet}」に固定
             </label>
           )}
         </section>
       )}
       </details>
 
-      {cardDb ? (
-        <section className="panel">
-          <h2>名前・番号で探す</h2>
-          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
-            placeholder="例: ジャシン、ボルシャック、25SD1 2" />
-          {query && !results.length && <p className="hint">見つかりませんでした。</p>}
-          {results.length > 0 && (
-            <>
-              <p className="hint">同じ名前のカード（再録・別イラスト）は1行にまとめています。横にスクロールしてイラストを選び、−/＋で枚数を変えられます。</p>
-              <CardGroups groups={resultGroups} cardDb={cardDb} owned={owned} onChange={change} highlight={/^[A-Za-z0-9-]{3,10}(\s|$)/.test(query.trim())} />
-            </>
-          )}
-          <p className="hint">カードリスト: {cardDb.size.toLocaleString()}枚（{new Date(cardDb.list.updatedAt).toLocaleDateString('ja-JP')} 時点）</p>
-        </section>
-      ) : (
-        <section className="panel">
-          <p className="hint">公式カードリストがまだ読み込まれていないので、カード情報は手で入力します。「データ」タブからカードリストのファイルを読み込むこともできます。</p>
-        </section>
-      )}
-
       <details className="panel manual" open={!cardDb || !!manual}>
-        <summary>手入力で登録する</summary>
+        <summary>手入力で登録</summary>
         <CardForm key={manual?.key ?? 0} initial={manual?.values ?? {}} onSaved={notify} lockedSet={lockedSet} onLockChange={setLockedSet} />
       </details>
     </>

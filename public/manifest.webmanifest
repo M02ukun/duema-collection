@@ -1,6 +1,6 @@
 {
-  "name": "デュエマ所持カード管理",
-  "short_name": "デュエマ所持",
+  "name": "デュエマ コレクション",
+  "short_name": "デュエマ",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

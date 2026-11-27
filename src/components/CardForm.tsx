@@ -141,7 +141,7 @@ export function CardForm({ initial, editing, onSaved, onCancel, lockedSet = '', 
         <img className="detail-img" src={cardImageUrl(editing)!} alt={editing.name} referrerPolicy="no-referrer"
           onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
       )}
-      {!editing && ownedCount > 0 && <p className="ok">登録済みのカードです（いま {ownedCount} 枚）。内容を自動で入れました。</p>}
+      {!editing && ownedCount > 0 && <p className="ok">登録済み（{ownedCount}枚）</p>}
       <div className="grid2">
         <label>パック記号<input value={v.setCode} onChange={(e) => set('setCode', e.target.value)} placeholder="24RP3" autoCapitalize="characters" /></label>
         <label>番号<input value={v.number} onChange={(e) => set('number', e.target.value)} placeholder="19/76" /></label>
