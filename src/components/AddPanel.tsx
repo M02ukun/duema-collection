@@ -11,6 +11,7 @@ import { cropCard, NameIndex, recognizeCardByName, warmUpNameOcr, type CardRect,
 import { recognizeCode } from '../ocr';
 import { loadFeatures, matchImage } from '../imagerec';
 import { matchEmbed, warmUpEmbed } from '../embed';
+import { costCivScore, readCostCiv, warmUpCostCiv, type CostCiv } from '../costciv';
 import { detectCard, warpCard } from '../cardDetect';
 import { useEffect } from 'react';
 import { CardForm, type FormValues } from './CardForm';
@@ -42,7 +43,8 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
   const [nameRes, setNameRes] = useState<(NameRecResult & { exact: MasterCard[]; ranked: { card: MasterCard; score: number }[] }) | null>(null);
   const [wholeError, setWholeError] = useState('');
   const [warped, setWarped] = useState('');
-  useEffect(() => { if (cardDb) { warmUpNameOcr(); loadFeatures(); warmUpEmbed(); } }, [cardDb]);
+  const [costCiv, setCostCiv] = useState<CostCiv | null>(null);
+  useEffect(() => { if (cardDb) { warmUpNameOcr(); loadFeatures(); warmUpEmbed(); warmUpCostCiv(); } }, [cardDb]);
   const byId = useMemo(() => new Map((cardDb?.list.cards ?? []).map((c) => [c.id, c])), [cardDb]);
 
   /** カード全体の画像から判別する。右下の番号が読めればそれで確定、だめならカード名で候補を出す */
@@ -58,6 +60,9 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
       const found = !!det && det.confidence >= 0.5;
       const card = found ? warpCard(src, det!.corners, 1300) : cropCard(src, rect, 1300);
       setWarped(card.toDataURL('image/jpeg', 0.7));
+      setStage('左上のコストと色を読んでいます…');
+      const cc = await readCostCiv(card).catch(() => null);
+      setCostCiv(cc);
       setStage('番号を探しています…');
       const code = await recognizeCode(card, { x: 0, y: 0.84, w: 1, h: 0.16 }, {
         knownSets, quick: true, targetHeight: 300,
@@ -103,6 +108,8 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
             ? 0.35 * v.name + 0.1 * v.img + 0.55 * v.ai + (v.name > 0.6 && v.ai > 0.6 ? 0.2 : 0)
             : fs ? 0.5 * v.name + 0.5 * v.img + (v.name > 0.6 && v.img > 0.6 ? 0.2 : 0) : v.name,
         }))
+        // 左上のコストと枠の色が合うカードを上げ、合わないカードを下げる
+        .map((x) => (cc ? { ...x, score: x.score + 0.25 * costCivScore(cc, x.card) } : x))
         .sort((a, b) => b.score - a.score)
         .slice(0, 12);
       setNameRes({ ...r, exact, ranked });
@@ -223,6 +230,7 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
           {nameRes && (
             <details className="ocr-debug">
               <summary>読み取った文字: {nameRes.lines.slice(0, 6).join(' / ') || '（なし）'}</summary>
+              {costCiv && <p className="hint">左上のコスト: {costCiv.cost ?? '読めず'}・枠の色: {costCiv.civConfidence > 0.3 ? Object.entries(costCiv.civ).filter(([, v]) => v >= 0.5).map(([k]) => k).join('/') : 'はっきりしない'}</p>}
               {warped && <><p className="hint">切り出したカード（ずれていたら撮り直してください）</p><img className="warped" src={warped} alt="切り出したカード" /></>}
               <img src={nameRes.preview} alt="判別に使った画像" />
             </details>
