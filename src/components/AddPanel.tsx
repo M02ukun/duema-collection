@@ -10,6 +10,7 @@ import { CardScanner } from './CardScanner';
 import { cropCard, NameIndex, recognizeCardByName, warmUpNameOcr, type CardRect, type NameRecResult } from '../namerec';
 import { recognizeCode } from '../ocr';
 import { loadFeatures, matchImage } from '../imagerec';
+import { detectCard, warpCard } from '../cardDetect';
 import { useEffect } from 'react';
 import { CardForm, type FormValues } from './CardForm';
 import { CardGroups } from './CardGroups';
@@ -39,6 +40,7 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
   const [stage, setStage] = useState('');
   const [nameRes, setNameRes] = useState<(NameRecResult & { exact: MasterCard[]; ranked: { card: MasterCard; score: number }[] }) | null>(null);
   const [wholeError, setWholeError] = useState('');
+  const [warped, setWarped] = useState('');
   useEffect(() => { if (cardDb) { warmUpNameOcr(); loadFeatures(); } }, [cardDb]);
   const byId = useMemo(() => new Map((cardDb?.list.cards ?? []).map((c) => [c.id, c])), [cardDb]);
 
@@ -49,8 +51,13 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
     setWholeError('');
     setNameRes(null);
     try {
+      setStage('カードの輪郭を探しています…');
+      // カードの四隅が見つかれば、まっすぐに直して切り出す。見つからなければ枠（写真なら全体）で切り出す
+      const det = detectCard(src, isPhoto ? undefined : rect);
+      const found = !!det && det.confidence >= 0.5;
+      const card = found ? warpCard(src, det!.corners, 1300) : cropCard(src, rect, 1300);
+      setWarped(card.toDataURL('image/jpeg', 0.7));
       setStage('番号を探しています…');
-      const card = cropCard(src, rect, 1300);
       const code = await recognizeCode(card, { x: 0, y: 0.84, w: 1, h: 0.16 }, {
         knownSets, quick: true, targetHeight: 300,
         isValid: (p) => !!p.number && cardDb.findByCode(lockedSet || p.setCode, p.number).length > 0,
@@ -68,7 +75,7 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
       }
       if (fs) {
         // 写真から選んだときはカードの位置がわからないので、中央からいくつかの大きさで切り出して試す
-        const crops = isPhoto ? photoCrops(src) : [card];
+        const crops = isPhoto && !found ? photoCrops(src) : [card];
         const m = matchImage(crops, fs);
         for (const t of m.top) {
           const c = byId.get(t.id);
@@ -198,6 +205,7 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
           {nameRes && (
             <details className="ocr-debug">
               <summary>読み取った文字: {nameRes.lines.slice(0, 6).join(' / ') || '（なし）'}</summary>
+              {warped && <><p className="hint">切り出したカード（ずれていたら撮り直してください）</p><img className="warped" src={warped} alt="切り出したカード" /></>}
               <img src={nameRes.preview} alt="判別に使った画像" />
             </details>
           )}

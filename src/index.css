@@ -156,3 +156,4 @@ details.manual > .panel { border: 0; padding: 10px 0 0; }
 .chip.warn { border-color: #d33; color: #d33; cursor: default; }
 .target-box { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; margin-bottom: 10px; border-radius: 10px; background: var(--accent); color: var(--accent-text); font-size: 14px; }
 textarea { width: 100%; font-size: 15px; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); box-sizing: border-box; }
+.ocr-debug img.warped { width: 160px; max-width: 50%; border-radius: 6px; }
