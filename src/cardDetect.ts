@@ -34,7 +34,7 @@ interface Line { a: number; b: number; votes: number }
  * prior: カメラの枠など、カードがだいたいこのあたりにあるはずという位置（0〜1の比率）。
  * あれば、そこから大きく外れた候補を選びにくくする。
  */
-export function detectCard(src: Src, prior?: { x: number; y: number; w: number; h: number }, debug?: unknown[]): Detection | null {
+export function detectCard(src: Src, prior?: { x: number; y: number; w: number; h: number }, debug?: unknown[], opts: { nested?: boolean } = {}): Detection | null {
   const { w: W0, h: H0 } = srcSize(src);
   if (!W0 || !H0) return null;
   const s = Math.min(1, MAXDIM / Math.max(W0, H0));
@@ -187,7 +187,7 @@ export function detectCard(src: Src, prior?: { x: number; y: number; w: number; 
   if (!best) return null;
   // カードケース（スクリューダウンなど）に入っていると、ケースの外形もカードと同じような長方形に見える。
   // 選んだ四角形の内側に、縁がはっきりしたカードの形の四角形があれば、そちらを本物のカードとみなす
-  for (let round = 0; round < 3; round++) {
+  for (let round = 0; round < (opts.nested === false ? 0 : 3); round++) {
     const outer: Cand = best;
     const ox = (outer.corners[1].x - outer.corners[0].x) * 0.015, oy = (outer.corners[3].y - outer.corners[0].y) * 0.015;
     const inside = (p: Pt) => p.x > Math.min(outer.corners[0].x, outer.corners[3].x) + ox && p.x < Math.max(outer.corners[1].x, outer.corners[2].x) - ox

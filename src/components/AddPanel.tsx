@@ -8,15 +8,16 @@ import { cardImageUrl, normNo, normSet, type CardDb, type MasterCard } from '../
 import type { OcrResult } from '../ocr';
 import { ScanPanel } from './ScanPanel';
 import { CardScanner } from './CardScanner';
-import { cropCard, NameIndex, recognizeCardByName, warmUpNameOcr, type CardRect, type NameRecResult } from '../namerec';
-import { recognizeCode } from '../ocr';
-import { loadFeatures, matchImage } from '../imagerec';
-import { matchEmbed, warmUpEmbed } from '../embed';
-import { costCivScore, readCostCiv, warmUpCostCiv, type CostCiv } from '../costciv';
+import { cropCard, NameIndex, warmUpNameOcr, type CardRect, type NameRecResult } from '../namerec';
+import { loadFeatures } from '../imagerec';
+import { warmUpEmbed } from '../embed';
+import { warmUpCostCiv, type CostCiv } from '../costciv';
+import { identifyCard } from '../identify';
 import { detectCard, warpCard } from '../cardDetect';
 import { useEffect } from 'react';
 import { CardForm, type FormValues } from './CardForm';
 import { CardGroups } from './CardGroups';
+import { MultiPanel } from './MultiPanel';
 import { IconCamera, IconCheck, IconImage, IconSearch } from './Icons';
 
 interface Props {
@@ -48,7 +49,6 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
   const [warped, setWarped] = useState('');
   const [costCiv, setCostCiv] = useState<CostCiv | null>(null);
   useEffect(() => { if (cardDb) { warmUpNameOcr(); loadFeatures(); warmUpEmbed(); warmUpCostCiv(); } }, [cardDb]);
-  const byId = useMemo(() => new Map((cardDb?.list.cards ?? []).map((c) => [c.id, c])), [cardDb]);
 
   /** カード全体の画像から判別する。右下の番号が読めればそれで確定、だめならカード名で候補を出す */
   async function identify(src: HTMLCanvasElement | HTMLImageElement, rect: CardRect, isPhoto = false) {
@@ -63,60 +63,14 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
       const found = !!det && det.confidence >= 0.5;
       const card = found ? warpCard(src, det!.corners, 1300) : cropCard(src, rect, 1300);
       setWarped(card.toDataURL('image/jpeg', 0.7));
-      setStage('コストを読み取っています…');
-      const cc = await readCostCiv(card).catch(() => null);
-      setCostCiv(cc);
-      setStage('番号を読み取っています…');
-      const code = await recognizeCode(card, { x: 0, y: 0.84, w: 1, h: 0.16 }, {
-        knownSets, quick: true, targetHeight: 300,
-        isValid: (p) => !!p.number && cardDb.findByCode(lockedSet || p.setCode, p.number).length > 0,
-      }).catch(() => null);
-      const exact = code?.valid ? cardDb.findByCode(lockedSet || code.setCode, code.number) : [];
-      const r = await recognizeCardByName(card, { x: 0, y: 0, w: 1, h: 1 }, nameIndex, setStage);
-
-      // イラストの色の配置で照合し、カード名の結果と合わせて順位をつける
-      setStage('イラストを照合しています…');
-      const fs = await loadFeatures();
-      const score = new Map<string, { card: MasterCard; name: number; img: number; ai: number }>();
-      for (const cand of r.candidates) for (const c of cand.cards) {
-        const prev = score.get(c.id);
-        if (!prev || prev.name < cand.score) score.set(c.id, { card: c, name: cand.score, img: 0, ai: 0 });
-      }
       // 写真から選んで輪郭が見つからなかったときは、中央からいくつかの大きさで切り出して試す
-      const crops = isPhoto && !found ? photoCrops(src) : [card];
-      const addTop = (ids: string[]) => {
-        for (const id of ids) {
-          const c = byId.get(id);
-          if (c && !score.has(c.id)) score.set(c.id, { card: c, name: 0, img: 0, ai: 0 });
-        }
-      };
-      let simImg: ((id: string) => number) | null = null;
-      if (fs) {
-        const m = matchImage(crops, fs);
-        addTop(m.top.map((t) => t.id));
-        simImg = m.simOf;
-      }
-      // 画像認識AI（Googleレンズのような方式）で照合する
-      setStage('イラストを照合しています…');
-      const em = await matchEmbed(crops).catch((e) => { console.warn(e); return null; });
-      if (em) addTop(em.top.map((t) => t.id));
-      for (const v of score.values()) {
-        if (simImg) v.img = Math.max(0, Math.min(1, (simImg(v.card.id) - 0.3) / 0.6));
-        // AIの似ている度合いは、どのカードでもそれなりに高く出るので、いちばん似ているカードとの差で見る
-        if (em) v.ai = Math.max(0, Math.min(1, 1 - (em.top[0].sim - em.simOf(v.card.id)) / 0.12));
-      }
-      const ranked = [...score.values()]
-        .map((v) => ({
-          card: v.card,
-          score: em
-            ? 0.35 * v.name + 0.1 * v.img + 0.55 * v.ai + (v.name > 0.6 && v.ai > 0.6 ? 0.2 : 0)
-            : fs ? 0.5 * v.name + 0.5 * v.img + (v.name > 0.6 && v.img > 0.6 ? 0.2 : 0) : v.name,
-        }))
-        // 左上のコストと枠の色が合うカードを上げ、合わないカードを下げる
-        .map((x) => (cc ? { ...x, score: x.score + 0.25 * costCivScore(cc, x.card) } : x))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 12);
-      setNameRes({ ...r, exact, ranked });
+      const res = await identifyCard(card, {
+        cardDb, nameIndex, knownSets, lockedSet, onStage: setStage,
+        crops: isPhoto && !found ? photoCrops(src) : undefined,
+      });
+      setCostCiv(res.costCiv);
+      const { exact, ranked } = res;
+      setNameRes(res);
       setWhole('idle');
       if (!exact.length && !ranked.length) setWholeError('見つかりませんでした。明るい場所で撮り直してみてください');
     } catch (e) {
@@ -235,6 +189,17 @@ export function AddPanel({ cardDb, lockedSet, setLockedSet, notify, targetBox, o
               {warped && <img className="warped" src={warped} alt="切り出したカード" />}
             </details>
           )}
+        </section>
+      )}
+      {cardDb && nameIndex && (
+        <section className="panel">
+          <MultiPanel cardDb={cardDb} nameIndex={nameIndex} knownSets={knownSets} lockedSet={lockedSet} notify={notify}
+            onRegister={async (list) => {
+              for (const { card, n } of list) {
+                await addMaster(card, n);
+                if (targetBox) await changeBoxItem(targetBox.id, card, n, false);
+              }
+            }} />
         </section>
       )}
 

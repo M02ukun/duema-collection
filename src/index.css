@@ -235,3 +235,17 @@ form.panel.row { flex-direction: row; flex-wrap: nowrap; align-items: center; }
 .row > .btn { flex: none; }
 .seg.wide { align-self: stretch; }
 .seg.wide button { white-space: nowrap; padding: 8px 10px; }
+
+/* まとめて撮る */
+.multi-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.multi-list li { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border-radius: 12px; background: var(--surface); opacity: .75; }
+.multi-list li.on { opacity: 1; outline: 2px solid var(--accent); }
+.multi-photo { width: 76px; flex: none; aspect-ratio: 63 / 88; object-fit: cover; border-radius: 5px; }
+.multi-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.multi-body select { width: 100%; }
+.multi-warn { font-size: 12px; color: var(--short); }
+.multi-ills { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.multi-ills button { flex: none; border: 2px solid transparent; background: none; padding: 1px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--sub); font-size: 10px; cursor: pointer; }
+.multi-ills button.on { border-color: var(--accent); color: var(--text); }
+.multi-ills .thumb, .multi-ills .cost { width: 44px; height: auto; aspect-ratio: 650 / 908; }
+.file-btn.disabled { opacity: .5; pointer-events: none; }
